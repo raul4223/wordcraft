@@ -650,6 +650,16 @@ impl WordApp {
         self.ui.start_screen
     }
 
+    /// The local time zone's offset from UTC in seconds (the host's `utc_offset`; UTC without one).
+    pub fn utc_offset(&self) -> i32 {
+        self.services.utc_offset.as_ref().map_or(0, |f| f())
+    }
+
+    /// The local wall-clock time now.
+    pub fn local_now(&self) -> home::Clock {
+        home::clock(i64::try_from(wordcraft_engine::cmd::now_unix()).unwrap_or(i64::MAX), self.utc_offset())
+    }
+
     /// Whether a document is open: false from a Start screen launch until the user creates or
     /// opens one (#1129).
     pub fn has_document(&self) -> bool {

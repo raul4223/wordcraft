@@ -157,17 +157,23 @@ fn heading(ui: &mut Ui, s: &str) {
     ui.add_space(16.0);
 }
 
-fn template_tile(ui: &mut Ui, app: &mut WordApp, label: &str, template: &str) {
+pub(crate) fn template_tile(ui: &mut Ui, app: &mut WordApp, label: &str, template: &str) {
     let t = Tokens::get(ui.ctx());
     ui.vertical(|ui| {
         // The label sits right under the thumbnail whatever row gap the gallery uses.
         ui.spacing_mut().item_spacing.y = 0.0;
-        let (r, resp) = ui.allocate_exact_size(vec2(150.0, 194.0), Sense::click());
+        let (slot, resp) = ui.allocate_exact_size(vec2(150.0, 194.0), Sense::click());
+        // Hovered cards lift a little over a soft shadow.
+        let lift = ui.ctx().animate_bool_with_time(resp.id.with("lift"), resp.hovered(), 0.12);
+        let r = slot.translate(vec2(0.0, -3.0 * lift));
+        if lift > 0.0 {
+            ui.painter().rect_filled(r.translate(vec2(0.0, 4.0)).expand(1.0), 4.0, t.page_shadow.gamma_multiply(lift));
+        }
         ui.painter().rect(
             r,
             2.0,
             egui::Color32::WHITE,
-            Stroke::new(if resp.hovered() { 2.0 } else { 1.0 }, if resp.hovered() { t.accent } else { t.border_strong }),
+            Stroke::new(1.0 + lift, if lift > 0.5 { t.accent } else { t.border_strong }),
             egui::StrokeKind::Inside,
         );
         let ppp = ui.ctx().pixels_per_point();
@@ -193,6 +199,11 @@ fn template_tile(ui: &mut Ui, app: &mut WordApp, label: &str, template: &str) {
         if let Some(h) = tex {
             ui.painter().image(h.id(), r.shrink(1.0), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), egui::Color32::WHITE);
         }
+        if template == "blank" {
+            let c = r.center();
+            ui.painter().circle_filled(c, 22.0, t.accent.gamma_multiply(0.12 + 0.18 * lift));
+            icons::paint(ui.painter(), Rect::from_center_size(c, vec2(26.0, 26.0)), "plus", t.accent, t.accent);
+        }
         // The caption opens the template too, as in Word.
         let caption = ui.add(egui::Label::new(egui::RichText::new(tl!(label)).font(regular(12.5))).sense(Sense::click()));
         if resp.clicked() || caption.clicked() {
@@ -207,12 +218,9 @@ fn template_tile(ui: &mut Ui, app: &mut WordApp, label: &str, template: &str) {
 const TEMPLATES: [(&str, &str); 5] =
     [("Blank document", "blank"), ("Studio handbook (sample)", "sample"), ("Letter", "letter"), ("Résumé", "resume"), ("Report", "report")];
 
-/// How many templates Home shows before "More templates" (the rest are on New).
-const HOME_TEMPLATES: usize = 4;
-
 /// The templates whose English or translated label, or id, contains `query` (case-insensitive;
 /// the id lets "resume" find "Résumé"); all of them for an empty query.
-fn matching_templates(query: &str) -> Vec<(&'static str, &'static str)> {
+pub(crate) fn matching_templates(query: &str) -> Vec<(&'static str, &'static str)> {
     let q = query.trim().to_lowercase();
     TEMPLATES
         .into_iter()
@@ -220,33 +228,8 @@ fn matching_templates(query: &str) -> Vec<(&'static str, &'static str)> {
         .collect()
 }
 
-/// Home: a greeting, Blank plus a short row of templates with a link to New, then Recent.
 fn home_page(app: &mut WordApp, ui: &mut Ui) {
-    let t = Tokens::get(ui.ctx());
-    let hour = wordcraft_engine::cmd::now_iso().get(11..13).and_then(|h| h.parse::<u32>().ok()).unwrap_or(9);
-    heading(
-        ui,
-        if hour < 12 {
-            "Good morning"
-        } else if hour < 18 {
-            "Good afternoon"
-        } else {
-            "Good evening"
-        },
-    );
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing = vec2(18.0, 0.0);
-        for (label, template) in TEMPLATES.into_iter().take(HOME_TEMPLATES) {
-            template_tile(ui, app, label, template);
-        }
-    });
-    ui.add_space(8.0);
-    let more = ui.add(egui::Label::new(egui::RichText::new(tl!("More templates →")).font(medium(13.5)).color(t.accent)).sense(Sense::click()));
-    if more.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
-        app.ui.backstage_page = "new".into();
-    }
-    ui.add_space(24.0);
-    open_list(app, ui);
+    crate::home::page(app, ui);
 }
 
 /// New: the whole template gallery with a search box; no Recent list (that is on Home and Open).
@@ -448,7 +431,6 @@ mod tests {
         h.run_steps(4);
         assert!(h.query_by_label("Recent").is_some(), "Home lists recent documents");
         assert!(h.query_by_label("Letter").is_some(), "Home shows the first templates");
-        assert!(h.query_by_label("Report").is_none(), "Home shows only a short row of templates");
         h.get_by_label("More templates →").click();
         h.run_steps(4);
         assert_eq!(h.state().ui.backstage_page, "new", "the link opens New");

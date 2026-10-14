@@ -2532,3 +2532,29 @@
 # Alignment guides (#1519)
 	Moved objects snap to the page's edges and centre, the margins and other objects. Hold Alt to move freely.	Đối tượng được di chuyển sẽ bắt vào mép và tâm trang, lề và các đối tượng khác. Giữ Alt để di chuyển tự do.
 	Show alignment guides when moving pictures and shapes	Hiện đường căn chỉnh khi di chuyển ảnh và hình
+	Search documents and templates	Tìm tài liệu và mẫu
+	Pinned	Đã ghim
+	Open file…	Mở tệp…
+	Folder	Thư mục
+	Modified	Đã sửa đổi
+	Yesterday	Hôm qua
+	Monday	Thứ Hai
+	Tuesday	Thứ Ba
+	Wednesday	Thứ Tư
+	Thursday	Thứ Năm
+	Friday	Thứ Sáu
+	Saturday	Thứ Bảy
+	Sunday	Chủ Nhật
+	File not found	Không tìm thấy tệp
+	More actions for {name}	Thêm thao tác cho {name}
+	Pin	Ghim
+	Unpin	Bỏ ghim
+	Pin {name}	Ghim {name}
+	Unpin {name}	Bỏ ghim {name}
+	Show in Finder	Hiện trong Finder
+	Show in folder	Hiện trong thư mục
+	Copy path	Sao chép đường dẫn
+	Remove from list	Xóa khỏi danh sách
+	Pin documents to keep them here.	Ghim tài liệu để giữ chúng ở đây.
+	Nothing matches your search.	Không có kết quả phù hợp.
+	Drop to open	Thả để mở

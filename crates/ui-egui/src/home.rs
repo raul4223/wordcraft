@@ -92,6 +92,354 @@ pub fn greeting(hour: u32) -> &'static str {
     }
 }
 
+use egui::{Align2, Color32, Rect, Sense, Stroke, Ui, pos2, vec2};
+use serde_json::json;
+
+use crate::theme::{Tokens, medium, regular, semibold};
+use crate::{WordApp, icons};
+
+/// What a document row's menu asked for; applied after drawing.
+enum RowAction {
+    Open,
+    TogglePin,
+    Reveal,
+    CopyPath,
+    Remove,
+}
+
+/// File › Home.
+pub(crate) fn page(app: &mut WordApp, ui: &mut Ui) {
+    let t = Tokens::get(ui.ctx());
+    let search_id = egui::Id::new("home_search");
+    let mut query = ui.ctx().data(|d| d.get_temp::<String>(search_id)).unwrap_or_default();
+    // Header, templates and list share one column, as wide as the five template cards.
+    let width = ui.available_width().min(1170.0);
+    ui.allocate_ui_with_layout(vec2(width, 40.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+        ui.label(egui::RichText::new(tl!(greeting(app.local_now().hh))).font(semibold(26.0)));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let edit = egui::TextEdit::singleline(&mut query)
+                .hint_text(tl!("Search documents and templates"))
+                .desired_width(320.0)
+                .margin(egui::Margin { left: 28, right: 8, top: 6, bottom: 6 });
+            let r = ui.add(edit);
+            icons::paint(
+                ui.painter(),
+                Rect::from_center_size(pos2(r.rect.min.x + 15.0, r.rect.center().y), vec2(16.0, 16.0)),
+                "search",
+                t.text_dim,
+                t.accent,
+            );
+            if r.changed() {
+                ui.ctx().data_mut(|d| d.insert_temp(search_id, query.clone()));
+            }
+        });
+    });
+    ui.add_space(18.0);
+
+    let templates = crate::backstage::matching_templates(&query);
+    if !templates.is_empty() {
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = vec2(18.0, 18.0);
+            for (label, template) in &templates {
+                crate::backstage::template_tile(ui, app, label, template);
+            }
+        });
+        ui.add_space(8.0);
+        let more = ui.add(egui::Label::new(egui::RichText::new(tl!("More templates →")).font(medium(13.5)).color(t.accent)).sense(Sense::click()));
+        if more.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+            app.ui.backstage_page = "new".into();
+        }
+        ui.add_space(26.0);
+    }
+
+    // Tabs and Open file….
+    let tab_id = egui::Id::new("home_tab");
+    let mut pinned_tab = ui.ctx().data(|d| d.get_temp::<bool>(tab_id)).unwrap_or(false);
+    ui.allocate_ui_with_layout(vec2(width, 32.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+        ui.spacing_mut().item_spacing.x = 22.0;
+        for (label, is_pinned) in [("Recent", false), ("Pinned", true)] {
+            let active = pinned_tab == is_pinned;
+            let r = ui.add(
+                egui::Label::new(egui::RichText::new(tl!(label)).font(if active { semibold(15.0) } else { medium(15.0) }).color(if active {
+                    t.text
+                } else {
+                    t.text_dim
+                }))
+                .sense(Sense::click()),
+            );
+            let k = ui.ctx().animate_bool_with_time(r.id.with("tab"), active, 0.15);
+            if k > 0.0 {
+                let y = r.rect.bottom() + 4.0;
+                let w = r.rect.width() * k;
+                ui.painter().line_segment([pos2(r.rect.center().x - w / 2.0, y), pos2(r.rect.center().x + w / 2.0, y)], Stroke::new(2.5, t.accent));
+            }
+            if r.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+                pinned_tab = is_pinned;
+                ui.ctx().data_mut(|d| d.insert_temp(tab_id, pinned_tab));
+            }
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui.button(egui::RichText::new(tl!("Open file…")).font(medium(13.5))).clicked() {
+                let _ = app.run("ui.openFileDialog", json!({}));
+            }
+        });
+    });
+    ui.add_space(8.0);
+    let (line, _) = ui.allocate_exact_size(vec2(width, 1.0), Sense::hover());
+    ui.painter().rect_filled(line, 0.0, t.border);
+    ui.add_space(6.0);
+
+    let source: Vec<String> = if pinned_tab { app.ui.pinned.clone() } else { app.ui.recent.iter().take(app.ui.recent_shown()).cloned().collect() };
+    let docs = filter_docs(&query, &source);
+    if docs.is_empty() {
+        empty_state(app, ui, pinned_tab, source.is_empty(), templates.is_empty());
+        return;
+    }
+    // Column headings.
+    let (head, _) = ui.allocate_exact_size(vec2(width, 22.0), Sense::hover());
+    for (label, x) in [("Name", 48.0), ("Folder", width * 0.44), ("Modified", width * 0.72)] {
+        ui.painter().text(pos2(head.min.x + x, head.center().y), Align2::LEFT_CENTER, tl!(label), regular(12.0), t.text_dim);
+    }
+    let now = app.local_now();
+    let offset = app.utc_offset();
+    let mut action = None;
+    for path in docs {
+        if let Some(a) = doc_row(app, ui, &path, width, now, offset, pinned_tab) {
+            action = Some((a, path));
+        }
+    }
+    if let Some((a, path)) = action {
+        match a {
+            RowAction::Open => {
+                let _ = app.run("file.open", json!({"path": path}));
+                app.ui.backstage = false;
+                app.canvas.want_focus = true;
+            }
+            RowAction::TogglePin => toggle_pin(&mut app.ui, &path),
+            RowAction::Reveal => {
+                if let Some(reveal) = &app.services.reveal {
+                    reveal(&path);
+                }
+            }
+            RowAction::CopyPath => ui.ctx().copy_text(path),
+            RowAction::Remove => remove_recent(&mut app.ui, &path),
+        }
+    }
+}
+
+/// The file's modification time as unix seconds; `Err` when it can't be read (missing file).
+/// The browser has no file system: `Ok(None)`.
+fn modified(path: &str) -> Result<Option<i64>, ()> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = path;
+        Ok(None)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let meta = std::fs::metadata(path).map_err(|_| ())?;
+        Ok(meta.modified().ok().and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX)))
+    }
+}
+
+/// A folder with the home folder shown as `~`.
+fn short_folder(folder: &str) -> String {
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rest) = std::env::var("HOME").ok().filter(|h| !h.is_empty()).and_then(|h| folder.strip_prefix(&h).map(str::to_string))
+        && (rest.is_empty() || rest.starts_with('/'))
+    {
+        return format!("~{rest}");
+    }
+    folder.to_string()
+}
+
+fn kind_color(t: &Tokens, k: DocKind) -> Color32 {
+    match k {
+        DocKind::Word => t.blue,
+        DocKind::Text => t.icon,
+        DocKind::Rich => t.orange,
+        DocKind::Web => t.green,
+        DocKind::Pdf => t.red,
+        DocKind::Other => t.text_dim,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn doc_row(app: &WordApp, ui: &mut Ui, path: &str, width: f32, now: Clock, offset: i32, pinned_tab: bool) -> Option<RowAction> {
+    let t = Tokens::get(ui.ctx());
+    let p = std::path::Path::new(path);
+    let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string());
+    let folder = p.parent().map(|f| short_folder(&f.to_string_lossy())).unwrap_or_default();
+    let stamp = modified(path);
+    let missing = stamp.is_err();
+    let when = friendly_time(stamp.ok().flatten().map(|s| clock(s, offset)), now);
+    let pinned = app.ui.pinned.iter().any(|x| x == path);
+
+    let (r, row) = ui.allocate_exact_size(vec2(width, 46.0), Sense::click());
+    row.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &name));
+    // The row's actions are always there for keyboard and screen readers; they show on hover.
+    let more_rect = Rect::from_center_size(pos2(r.max.x - 22.0, r.center().y), vec2(28.0, 28.0));
+    let pin_rect = Rect::from_center_size(pos2(r.max.x - 56.0, r.center().y), vec2(28.0, 28.0));
+    let more = ui.interact(more_rect, row.id.with("more"), Sense::click());
+    let more_label = tl!("More actions for {name}").replace("{name}", &name);
+    more.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &more_label));
+    let pin = ui.interact(pin_rect, row.id.with("pin"), Sense::click());
+    let pin_label = if pinned { tl!("Unpin") } else { tl!("Pin") };
+    let pin_name = if pinned { tl!("Unpin {name}") } else { tl!("Pin {name}") }.replace("{name}", &name);
+    pin.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &pin_name));
+
+    let menu_open = egui::Popup::is_id_open(ui.ctx(), egui::Popup::default_response_id(&more));
+    let hot = row.hovered() || more.hovered() || pin.hovered() || menu_open;
+    let k = ui.ctx().animate_bool_with_time(row.id.with("hover"), hot, 0.12);
+    if k > 0.0 {
+        ui.painter().rect_filled(r, 6.0, t.hover.gamma_multiply(k));
+    }
+    // Type badge.
+    let badge = Rect::from_center_size(pos2(r.min.x + 22.0, r.center().y), vec2(24.0, 30.0));
+    let tint = if missing { t.text_disabled } else { kind_color(&t, kind_of(path)) };
+    ui.painter().rect_filled(badge, 4.0, tint);
+    let fold = 7.0;
+    ui.painter().add(egui::Shape::convex_polygon(
+        vec![pos2(badge.max.x - fold, badge.min.y), badge.right_top(), pos2(badge.max.x, badge.min.y + fold)],
+        t.ribbon,
+        Stroke::NONE,
+    ));
+    let ext = p.extension().map(|e| e.to_string_lossy().to_uppercase()).unwrap_or_default();
+    let ext: String = ext.chars().take(4).collect();
+    ui.painter().text(pos2(badge.center().x, badge.max.y - 9.0), Align2::CENTER_CENTER, ext, semibold(7.5), Color32::WHITE);
+
+    let col = |x: f32, w: f32| Rect::from_min_size(pos2(r.min.x + x, r.min.y), vec2(w, r.height()));
+    let name_col = col(48.0, width * 0.44 - 56.0);
+    let folder_col = col(width * 0.44, width * 0.28 - 10.0);
+    ui.painter().with_clip_rect(name_col).text(
+        pos2(name_col.min.x, r.center().y),
+        Align2::LEFT_CENTER,
+        &name,
+        medium(13.5),
+        if missing { t.text_disabled } else { t.text },
+    );
+    if missing {
+        ui.put(folder_col, egui::Label::new(egui::RichText::new(tl!("File not found")).font(regular(12.0)).color(t.text_disabled)).selectable(false));
+    } else {
+        ui.painter().with_clip_rect(folder_col).text(pos2(folder_col.min.x, r.center().y), Align2::LEFT_CENTER, &folder, regular(12.0), t.text_dim);
+    }
+    ui.painter().text(pos2(r.min.x + width * 0.72, r.center().y), Align2::LEFT_CENTER, &when, regular(12.0), t.text_dim);
+
+    if hot || pinned {
+        let c = if pinned {
+            t.accent
+        } else if pin.hovered() {
+            t.text
+        } else {
+            t.icon
+        };
+        if pin.hovered() {
+            ui.painter().rect_filled(pin_rect, 4.0, t.pressed);
+        }
+        icons::paint(ui.painter(), pin_rect.shrink(6.0), "pin", c, t.accent);
+    }
+    if hot {
+        if more.hovered() || menu_open {
+            ui.painter().rect_filled(more_rect, 4.0, t.pressed);
+        }
+        icons::paint(ui.painter(), more_rect.shrink(6.0), "more", t.icon, t.accent);
+    }
+
+    let mut action = None;
+    let mut menu = |ui: &mut Ui| {
+        if ui.button(tl!("Open")).clicked() {
+            action = Some(RowAction::Open);
+        }
+        if ui.button(pin_label).clicked() {
+            action = Some(RowAction::TogglePin);
+        }
+        if app.services.reveal.is_some() {
+            let label = if cfg!(target_os = "macos") { "Show in Finder" } else { "Show in folder" };
+            if ui.add_enabled(!missing, egui::Button::new(tl!(label))).clicked() {
+                action = Some(RowAction::Reveal);
+            }
+        }
+        if ui.button(tl!("Copy path")).clicked() {
+            action = Some(RowAction::CopyPath);
+        }
+        if !pinned_tab && ui.button(tl!("Remove from list")).clicked() {
+            action = Some(RowAction::Remove);
+        }
+    };
+    egui::Popup::menu(&more).show(&mut menu);
+    row.context_menu(&mut menu);
+    if pin.clicked() {
+        return Some(RowAction::TogglePin);
+    }
+    if action.is_none() && row.clicked() {
+        return Some(RowAction::Open);
+    }
+    action
+}
+
+/// No documents to list: a drawn illustration and a way forward.
+fn empty_state(app: &mut WordApp, ui: &mut Ui, pinned_tab: bool, nothing_at_all: bool, no_templates: bool) {
+    let t = Tokens::get(ui.ctx());
+    ui.add_space(18.0);
+    if !nothing_at_all {
+        if no_templates {
+            ui.label(egui::RichText::new(tl!("Nothing matches your search.")).color(t.text_dim));
+        }
+        return;
+    }
+    if pinned_tab {
+        ui.horizontal(|ui| {
+            let (r, _) = ui.allocate_exact_size(vec2(28.0, 28.0), Sense::hover());
+            icons::paint(ui.painter(), r, "pin", t.text_dim, t.accent);
+            ui.label(egui::RichText::new(tl!("Pin documents to keep them here.")).color(t.text_dim));
+        });
+        return;
+    }
+    ui.horizontal(|ui| {
+        let (r, _) = ui.allocate_exact_size(vec2(84.0, 84.0), Sense::hover());
+        illustration(ui.painter(), r, &t);
+        ui.add_space(12.0);
+        ui.vertical(|ui| {
+            ui.add_space(14.0);
+            ui.label(egui::RichText::new(tl!("Documents you open will show up here.")).font(medium(14.0)).color(t.text));
+            ui.add_space(10.0);
+            let new = egui::Button::new(egui::RichText::new(tl!("New document")).font(medium(13.5)).color(t.on_accent)).fill(t.accent);
+            if ui.add(new).clicked() {
+                let _ = app.run("file.new", json!({"template": "blank"}));
+                app.ui.backstage = false;
+                app.canvas.want_focus = true;
+            }
+        });
+    });
+}
+
+/// A page with a few lines of text and a sparkle (original artwork).
+fn illustration(p: &egui::Painter, r: Rect, t: &Tokens) {
+    let page = Rect::from_center_size(r.center() + vec2(-4.0, 4.0), vec2(50.0, 64.0));
+    p.rect_filled(page.translate(vec2(3.0, 3.0)), 4.0, t.page_shadow);
+    p.rect(page, 4.0, Color32::WHITE, Stroke::new(1.5, t.border_strong), egui::StrokeKind::Inside);
+    for (i, w) in [30.0, 24.0, 32.0, 18.0].into_iter().enumerate() {
+        let y = page.min.y + 16.0 + i as f32 * 10.0;
+        p.line_segment([pos2(page.min.x + 9.0, y), pos2(page.min.x + 9.0 + w, y)], Stroke::new(2.5, t.border_strong));
+    }
+    let c = pos2(page.max.x + 2.0, page.min.y + 2.0);
+    let (a, b) = (11.0, 3.0);
+    p.add(egui::Shape::convex_polygon(
+        vec![
+            pos2(c.x, c.y - a),
+            pos2(c.x + b, c.y - b),
+            pos2(c.x + a, c.y),
+            pos2(c.x + b, c.y + b),
+            pos2(c.x, c.y + a),
+            pos2(c.x - b, c.y + b),
+            pos2(c.x - a, c.y),
+            pos2(c.x - b, c.y - b),
+        ],
+        t.accent,
+        Stroke::NONE,
+    ));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,8 +519,7 @@ mod tests {
 
     #[test]
     fn remove_recent_keeps_pin() {
-        let mut ui = crate::UiState::default();
-        ui.recent = vec!["/a".into(), "/b".into()];
+        let mut ui = crate::UiState { recent: vec!["/a".into(), "/b".into()], ..Default::default() };
         toggle_pin(&mut ui, "/a");
         remove_recent(&mut ui, "/a");
         assert_eq!(ui.recent, vec!["/b"]);
@@ -191,5 +538,95 @@ mod tests {
         assert_eq!(greeting(5), "Good morning");
         assert_eq!(greeting(12), "Good afternoon");
         assert_eq!(greeting(18), "Good evening");
+    }
+
+    fn harness(a: crate::WordApp) -> egui_kittest::Harness<'static, crate::WordApp> {
+        egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+            |ui, app: &mut crate::WordApp| {
+                let ctx = ui.ctx().clone();
+                app.logic(&ctx);
+                app.ui(ui);
+            },
+            a,
+        )
+    }
+
+    fn app_with_recent(paths: &[&str]) -> crate::WordApp {
+        let mut a = crate::WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), crate::Services::default());
+        a.ui.recent = paths.iter().map(|p| p.to_string()).collect();
+        a.run("ui.backstage", serde_json::json!({"value": true, "page": "home"})).unwrap();
+        a
+    }
+
+    #[test]
+    fn home_has_tabs_search_and_all_templates() {
+        use egui_kittest::kittest::Queryable;
+        let mut h = harness(app_with_recent(&[]));
+        h.run_steps(4);
+        for l in ["Recent", "Pinned", "Report", "Blank document", "Open file…", "New document"] {
+            assert!(h.query_by_label(l).is_some(), "{l}");
+        }
+        assert!(h.query_by_role(egui::accesskit::Role::TextInput).is_some(), "search box");
+    }
+
+    #[test]
+    fn pin_from_menu_moves_to_pinned_tab() {
+        use egui_kittest::kittest::Queryable;
+        let mut h = harness(app_with_recent(&["/nowhere/a.docx"]));
+        h.run_steps(4);
+        h.get_by_label("More actions for a.docx").click();
+        h.run_steps(3);
+        h.get_by_label("Pin").click();
+        h.run_steps(3);
+        assert_eq!(h.state().ui.pinned, vec!["/nowhere/a.docx"]);
+        h.get_by_label("Pinned").click();
+        h.run_steps(3);
+        assert!(h.query_by_label("a.docx").is_some());
+        assert!(h.query_by_label("Pin documents to keep them here.").is_none());
+    }
+
+    #[test]
+    fn remove_from_list_drops_recent() {
+        use egui_kittest::kittest::Queryable;
+        let mut h = harness(app_with_recent(&["/nowhere/a.docx", "/nowhere/b.md"]));
+        h.run_steps(4);
+        h.get_by_label("More actions for a.docx").click();
+        h.run_steps(3);
+        h.get_by_label("Remove from list").click();
+        h.run_steps(3);
+        assert_eq!(h.state().ui.recent, vec!["/nowhere/b.md"]);
+    }
+
+    #[test]
+    fn search_filters_documents_and_templates() {
+        use egui_kittest::kittest::Queryable;
+        let mut h = harness(app_with_recent(&["/nowhere/a.docx", "/nowhere/budget.md"]));
+        h.run_steps(4);
+        h.get_by_role(egui::accesskit::Role::TextInput).focus();
+        h.run_steps(1);
+        h.get_by_role(egui::accesskit::Role::TextInput).type_text("budget");
+        h.run_steps(3);
+        assert!(h.query_by_label("budget.md").is_some());
+        assert!(h.query_by_label("a.docx").is_none());
+        assert!(h.query_by_label("Letter").is_none());
+    }
+
+    #[test]
+    fn missing_recent_row_is_dimmed_not_fatal() {
+        use egui_kittest::kittest::Queryable;
+        let mut h = harness(app_with_recent(&["/definitely/not/here.docx"]));
+        h.run_steps(4);
+        assert!(h.query_by_label("File not found").is_some());
+    }
+
+    #[test]
+    fn show_in_finder_hidden_without_service() {
+        use egui_kittest::kittest::Queryable;
+        let mut h = harness(app_with_recent(&["/nowhere/a.docx"]));
+        h.run_steps(4);
+        h.get_by_label("More actions for a.docx").click();
+        h.run_steps(3);
+        assert!(h.query_by_label("Show in Finder").is_none() && h.query_by_label("Show in folder").is_none());
+        assert!(h.query_by_label("Copy path").is_some());
     }
 }
