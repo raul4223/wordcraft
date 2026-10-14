@@ -29,7 +29,7 @@ USAGE:
                                               who tracked changes and comments are by)
   wordcraft-cli commands [--json]             list every command
   wordcraft-cli parity [--markdown]           feature-catalog parity
-  wordcraft-cli mcp [--connect HOST:PORT | --author NAME] [--automation-read-root DIR] [--automation-write-root DIR]
+  wordcraft-cli mcp [--connect HOST:PORT [--agent NAME] | --author NAME] [--automation-read-root DIR] [--automation-write-root DIR]
                                               MCP server on stdio (headless, or bridged to the app).
                                               --automation-read-root / --automation-write-root confine
                                               the files the agent's commands read (open, insert text
@@ -148,7 +148,11 @@ const RUN_OPTIONS: &[OptionSpec] = &[
 ];
 const COMMANDS_OPTIONS: &[OptionSpec] = &[OptionSpec { name: "--json", takes_value: false }];
 const PARITY_OPTIONS: &[OptionSpec] = &[OptionSpec { name: "--markdown", takes_value: false }];
-const MCP_OPTIONS: &[OptionSpec] = &[OptionSpec { name: "--connect", takes_value: true }, OptionSpec { name: "--author", takes_value: true }];
+const MCP_OPTIONS: &[OptionSpec] = &[
+    OptionSpec { name: "--connect", takes_value: true },
+    OptionSpec { name: "--author", takes_value: true },
+    OptionSpec { name: "--agent", takes_value: true },
+];
 const ZOTERO_OPTIONS: &[OptionSpec] = &[
     OptionSpec { name: "--cmd", takes_value: true },
     OptionSpec { name: "--save", takes_value: true },
@@ -346,7 +350,14 @@ fn run(args: &[String]) -> Result<(), Failure> {
                         .into(),
                 );
             }
+            let agent = arg_value(&rest, "--agent");
+            if agent.is_some() && connect.is_none() {
+                return Err("mcp: --agent names the AI agent driving a running app; use it with --connect".into());
+            }
             let backend: Box<dyn wordcraft_mcp::Backend> = match connect {
+                // An AI agent's bridge (written by WordCraft's AI agents dialog): starts without the
+                // app and names the agent on every request.
+                Some(addr) if agent.is_some() => Box::new(wordcraft_mcp::Remote::for_agent(&addr, agent.as_deref().unwrap_or("AI agent"))),
                 // The app's user name is the person's own setting; don't rewrite it from a flag.
                 Some(_) if author.is_some() => {
                     return Err("mcp: --author applies to the headless server; with --connect, run file.setAuthor".into());
@@ -484,6 +495,7 @@ mod tests {
         assert!(validate_options("commands", &args(&["--json"]), COMMANDS_OPTIONS).is_ok());
         assert!(validate_options("parity", &args(&["--markdown"]), PARITY_OPTIONS).is_ok());
         assert!(validate_options("mcp", &args(&["--connect", "127.0.0.1:9000"]), MCP_OPTIONS).is_ok());
+        assert!(validate_options("mcp", &args(&["--connect", "127.0.0.1:7979", "--agent", "Claude"]), MCP_OPTIONS).is_ok());
         assert!(validate_options("render", &args(&["in.docx", "out.png", "--page"]), RENDER_OPTIONS).is_ok());
         assert!(
             validate_options(

@@ -31,6 +31,9 @@ pub struct Remote {
     /// The control key, looked up once per connection (the app picks a new one at every start).
     key: Option<String>,
     find_key: KeyFinder,
+    /// The AI agent this bridge speaks for (`--agent`): every request names it, and the app
+    /// records its edits as tracked changes by it.
+    agent: Option<String>,
 }
 
 /// The control key: `env` (`WORDCRAFT_CONTROL_KEY`) when set, else the app's key file for
@@ -83,12 +86,27 @@ impl Remote {
     }
 
     fn connect_with(addr: &str, find_key: KeyFinder) -> std::io::Result<Self> {
-        let mut r = Self { addr: addr.to_string(), conn: None, next_id: 1, send_key: false, key: None, find_key };
+        let mut r = Self { addr: addr.to_string(), conn: None, next_id: 1, send_key: false, key: None, find_key, agent: None };
         r.reconnect()?;
         if let Some(w) = r.key_warning() {
             log::warn!("{w}");
         }
         Ok(r)
+    }
+
+    /// A bridge for an AI agent (`--agent NAME`) to the app's AI agents channel at `addr`. It
+    /// starts without the app: the first request connects, so the agent's client can launch it
+    /// before WordCraft is open or before AI agents are switched on.
+    pub fn for_agent(addr: &str, agent: &str) -> Self {
+        Self {
+            addr: addr.to_string(),
+            conn: None,
+            next_id: 1,
+            send_key: false,
+            key: None,
+            find_key: Box::new(find_key),
+            agent: Some(agent.to_string()),
+        }
     }
 
     pub fn addr(&self) -> &str {
@@ -130,6 +148,9 @@ impl Remote {
     /// connection).
     fn request_line(&mut self, id: u64, method: &str, params: &Value) -> Result<String, String> {
         let mut req = json!({"id": id, "method": method, "params": params});
+        if let Some(agent) = &self.agent {
+            req["agent"] = json!(agent);
+        }
         if self.send_key {
             let key = match &self.key {
                 Some(k) => k.clone(),
@@ -158,7 +179,14 @@ impl Remote {
     /// One request and its reply, with one retry on a new connection (the app may have
     /// restarted; a new connection also reads the key again).
     fn exchange(&mut self, id: u64, method: &str, params: &Value) -> Result<Value, String> {
-        let unreachable = |addr: &str, e: std::io::Error| format!("WordCraft app at {addr} is not reachable: {e}");
+        let agent = self.agent.is_some();
+        let unreachable = |addr: &str, e: std::io::Error| {
+            if agent {
+                format!("WordCraft is not reachable at {addr} ({e}): open WordCraft and turn on AI agents (the AI agents button in its title bar)")
+            } else {
+                format!("WordCraft app at {addr} is not reachable: {e}")
+            }
+        };
         let mut first = true;
         let reply = loop {
             let tried = if self.conn.is_some() { Ok(()) } else { self.reconnect() };
@@ -230,6 +258,21 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::mpsc::{Receiver, channel};
+
+    #[test]
+    fn agent_requests_name_the_agent_and_start_without_the_app() {
+        // No app is listening on port 1: an agent bridge still starts (the app may open later).
+        let mut r = Remote::for_agent("127.0.0.1:1", "Claude");
+        let line: Value = serde_json::from_str(&r.request_line(7, "engine.execute", &json!({"command": "text.insert"})).unwrap()).unwrap();
+        assert_eq!(line["agent"], "Claude");
+        assert_eq!(line["method"], "engine.execute");
+        let e = r.call("engine.commands", json!({})).unwrap_err();
+        assert!(e.contains("AI agents"), "{e}");
+        let plain = Remote { agent: None, ..Remote::for_agent("127.0.0.1:1", "x") };
+        let mut plain = plain;
+        let line: Value = serde_json::from_str(&plain.request_line(1, "ping", &json!({})).unwrap()).unwrap();
+        assert!(line.get("agent").is_none());
+    }
 
     #[test]
     fn key_from_env_then_key_file() {
