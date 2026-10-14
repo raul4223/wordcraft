@@ -54,6 +54,7 @@ pub mod file_browser;
 pub mod file_dialogs;
 pub mod frame;
 pub mod guides;
+pub mod home;
 pub mod i18n;
 pub mod icons;
 pub mod ink;
@@ -105,6 +106,12 @@ pub struct Services {
     /// sender counts as cancelled. An `Err` says no system dialog could be shown, and the app shows
     /// its built-in file browser instead (#576). The app shows one dialog at a time ([`file_dialogs`]).
     pub file_dialog: Option<Box<dyn Fn(FileDialogRequest) -> std::sync::mpsc::Receiver<FileDialogAnswer>>>,
+    /// Desktop: the local time zone's offset from UTC in seconds (east positive), for the Home
+    /// greeting and document times. `None`: UTC.
+    pub utc_offset: Option<Box<dyn Fn() -> i32>>,
+    /// Desktop: show a file in the system file manager (File › Home › Show in Finder). `None`
+    /// hides the action (web, tests).
+    pub reveal: Option<Box<dyn Fn(&str)>>,
     /// Web: open a file picker; the file arrives later through `inbox`.
     pub open_async: Option<Box<dyn Fn(&str)>>,
     /// Web: files (name, bytes) delivered asynchronously (picker, drag and drop).
@@ -228,6 +235,8 @@ pub struct UiState {
     pub print: print_page::PrintSettings,
     pub ribbon_collapsed: bool,
     pub recent: Vec<String>,
+    /// Documents pinned on File › Home, newest pin first.
+    pub pinned: Vec<String>,
     /// Symbols inserted from the Symbol dialog, most recent first (#321).
     pub recent_symbols: Vec<dialogs_insert::RecentSymbol>,
     /// Colours picked in the Colors dialog (More Colors…), most recent first (#606).
@@ -332,6 +341,7 @@ impl Default for UiState {
             print: print_page::PrintSettings::default(),
             ribbon_collapsed: false,
             recent: Vec::new(),
+            pinned: Vec::new(),
             recent_symbols: Vec::new(),
             recent_colors: Vec::new(),
             theme: theme::Appearance::default(),
