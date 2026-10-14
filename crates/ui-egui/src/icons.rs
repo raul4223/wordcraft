@@ -29,47 +29,13 @@ impl<'a> Pen<'a> {
     fn stroke(&self, c: Color32) -> Stroke {
         Stroke::new(self.w * self.s(), c)
     }
-    fn line(&self, pts: &[(f32, f32)]) {
-        self.line_c(pts, self.c);
-    }
-    fn line_c(&self, pts: &[(f32, f32)], c: Color32) {
-        let v: Vec<Pos2> = pts.iter().map(|&(x, y)| self.pt(x, y)).collect();
-        self.p.add(Shape::line(v, self.stroke(c)));
-    }
     fn closed(&self, pts: &[(f32, f32)], c: Color32) {
         let v: Vec<Pos2> = pts.iter().map(|&(x, y)| self.pt(x, y)).collect();
         self.p.add(Shape::closed_line(v, self.stroke(c)));
     }
-    fn fill(&self, pts: &[(f32, f32)], c: Color32) {
-        let v: Vec<Pos2> = pts.iter().map(|&(x, y)| self.pt(x, y)).collect();
-        self.p.add(Shape::convex_polygon(v, c, Stroke::NONE));
-    }
-    fn rect(&self, x0: f32, y0: f32, x1: f32, y1: f32, c: Color32) {
-        self.p.rect_stroke(Rect::from_min_max(self.pt(x0, y0), self.pt(x1, y1)), 1.0, self.stroke(c), egui::StrokeKind::Middle);
-    }
-    fn frect(&self, x0: f32, y0: f32, x1: f32, y1: f32, c: Color32) {
-        self.p.rect_filled(Rect::from_min_max(self.pt(x0, y0), self.pt(x1, y1)), 0.5, c);
-    }
-    fn circle(&self, x: f32, y: f32, r: f32, c: Color32) {
-        self.p.circle_stroke(self.pt(x, y), r * self.s(), self.stroke(c));
-    }
-    fn fcircle(&self, x: f32, y: f32, r: f32, c: Color32) {
-        self.p.circle_filled(self.pt(x, y), r * self.s(), c);
-    }
     fn text(&self, x: f32, y: f32, size: f32, t: &str, c: Color32, bold: bool) {
         let font = if bold { crate::theme::semibold(size * self.s()) } else { FontId::proportional(size * self.s()) };
         self.p.text(self.pt(x, y), egui::Align2::CENTER_CENTER, t, font, c);
-    }
-    /// Horizontal text lines (a paragraph).
-    fn lines(&self, x0: f32, x1: f32, ys: &[f32]) {
-        for y in ys {
-            self.line(&[(x0, *y), (x1, *y)]);
-        }
-    }
-    /// A page outline with a folded corner.
-    fn page(&self, x0: f32, y0: f32, x1: f32, y1: f32) {
-        self.closed(&[(x0, y0), (x1 - 4.0, y0), (x1, y0 + 4.0), (x1, y1), (x0, y1)], self.c);
-        self.line(&[(x1 - 4.0, y0), (x1 - 4.0, y0 + 4.0), (x1, y0 + 4.0)]);
     }
     /// Rounded rectangle; a `TRANSPARENT` fill or stroke is left out.
     #[allow(clippy::too_many_arguments)]
@@ -143,9 +109,6 @@ impl<'a> Pen<'a> {
     /// A filled dot.
     fn dot(&self, x: f32, y: f32, r: f32, c: Color32) {
         self.p.circle_filled(self.pt(x, y), r * self.s(), c);
-    }
-    fn arrow_down(&self, x: f32, y: f32, c: Color32) {
-        self.fill(&[(x - 2.5, y - 1.2), (x + 2.5, y - 1.2), (x, y + 1.5)], c);
     }
 }
 
@@ -268,9 +231,6 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
 /// Draw the art for `name`; false when there is none.
 fn art(pen: &Pen, name: &str) -> bool {
     let (r, c, a) = (pen.r, pen.c, pen.a);
-    let pick = |x: u32| if pen.mono { c } else { rgb(x) };
-    let red = pick(0xD13B3B);
-    let green = pick(0x2E8B57);
     match name {
         // Clipboard
         "paste" => {
@@ -1209,223 +1169,264 @@ fn art(pen: &Pen, name: &str) -> bool {
         }
         // Review
         "thesaurus" => {
-            pen.rect(3.5, 2.5, 16.5, 17.5, c);
-            pen.text(10.0, 9.5, 8.0, "Aa", a, true);
+            let k = pen.k;
+            pen.rr(3.5, 2.5, 16.5, 17.5, 1.6, k.tint, k.ink);
+            pen.rr(3.5, 2.5, 6.5, 17.5, 1.6, k.solid, Color32::TRANSPARENT);
+            pen.text(11.5, 9.5, 7.5, "Aa", k.ink, true);
         }
-        "wordCount" => pen.text(10.0, 10.0, 9.0, "123", a, true),
+        "wordCount" => pen.text(10.0, 10.0, 9.5, "123", pen.k.solid, true),
         "readAloud" => {
-            pen.text(6.0, 10.0, 10.0, "A", c, false);
-            pen.line_c(&[(12.0, 7.0), (13.5, 10.0), (12.0, 13.0)], a);
-            pen.line_c(&[(14.5, 5.0), (17.0, 10.0), (14.5, 15.0)], a);
+            let k = pen.k;
+            pen.text(6.0, 10.0, 11.0, "A", k.ink, false);
+            pen.heavy(&[(12.0, 7.0), (13.5, 10.0), (12.0, 13.0)], k.solid, 1.0);
+            pen.heavy(&[(14.5, 4.5), (17.0, 10.0), (14.5, 15.5)], k.solid, 1.0);
         }
         "accessibility" => {
-            pen.fcircle(10.0, 4.0, 1.6, a);
-            pen.line(&[(4.0, 7.0), (16.0, 7.0)]);
-            pen.line(&[(10.0, 7.0), (10.0, 12.0), (7.0, 17.5)]);
-            pen.line(&[(10.0, 12.0), (13.0, 17.5)]);
+            let k = pen.k;
+            pen.disc(10.0, 10.0, 8.0, k.tint, Color32::TRANSPARENT);
+            pen.dot(10.0, 5.0, 1.7, k.solid);
+            pen.seg(&[(5.0, 8.0), (15.0, 8.0)], k.ink);
+            pen.seg(&[(10.0, 8.0), (10.0, 12.0), (7.5, 16.0)], k.ink);
+            pen.seg(&[(10.0, 12.0), (12.5, 16.0)], k.ink);
         }
         "altText" => {
             // A small picture with lines of text beside and below it.
-            pen.rect(2.5, 3.5, 11.5, 11.0, c);
-            pen.line_c(&[(3.5, 10.0), (6.0, 6.5), (8.0, 8.5), (9.0, 7.5), (10.5, 10.0)], a);
+            let k = pen.k;
+            pen.rr(2.5, 3.5, 11.5, 11.0, 1.2, k.tint, k.ink);
+            pen.poly(&[(3.5, 10.2), (6.5, 6.2), (9.5, 10.2)], k.solid, Color32::TRANSPARENT);
             for (x0, x1, y) in [(13.5, 17.5, 5.0), (13.5, 17.5, 8.0), (2.5, 17.5, 14.0), (2.5, 13.0, 17.0)] {
-                pen.line_c(&[(x0, y), (x1, y)], c);
+                pen.seg(&[(x0, y), (x1, y)], k.ink);
             }
         }
         "translate" | "language" => {
-            pen.text(6.5, 7.0, 9.0, "A", c, true);
-            pen.text(13.5, 13.5, 9.0, "あ", a, false);
+            let k = pen.k;
+            pen.rr(1.8, 1.8, 11.2, 11.2, 1.6, k.tint, k.ink);
+            pen.text(6.5, 6.5, 8.0, "A", k.ink, true);
+            pen.rr(8.8, 8.8, 18.2, 18.2, 1.6, k.solid, Color32::TRANSPARENT);
+            pen.text(13.5, 13.5, 7.5, "あ", pen.n.tint, false);
         }
-        "deleteComment" => {
-            pen.closed(&[(2.5, 3.5), (17.5, 3.5), (17.5, 13.5), (9.0, 13.5), (5.0, 17.0), (5.0, 13.5), (2.5, 13.5)], c);
-            pen.line_c(&[(7.5, 6.0), (12.5, 11.0)], red);
-            pen.line_c(&[(12.5, 6.0), (7.5, 11.0)], red);
-        }
-        "prevComment" | "nextComment" => {
-            pen.closed(&[(2.5, 3.5), (17.5, 3.5), (17.5, 13.5), (9.0, 13.5), (5.0, 17.0), (5.0, 13.5), (2.5, 13.5)], c);
-            let pts: &[(f32, f32)] =
-                if name == "nextComment" { &[(8.0, 6.0), (12.0, 8.5), (8.0, 11.0)] } else { &[(12.0, 6.0), (8.0, 8.5), (12.0, 11.0)] };
-            pen.line_c(pts, a);
+        "deleteComment" | "prevComment" | "nextComment" | "resolve" => {
+            let k = pen.fam(Family::Purple);
+            pen.rr(2.5, 3.0, 17.5, 13.5, 2.2, k.tint, k.ink);
+            pen.poly(&[(5.0, 13.0), (9.5, 13.0), (5.0, 17.5)], k.tint, Color32::TRANSPARENT);
+            pen.seg(&[(5.0, 13.5), (5.0, 17.5), (9.5, 13.5)], k.ink);
+            match name {
+                "deleteComment" => {
+                    let r = pen.fam(Family::Red).solid;
+                    pen.heavy(&[(7.6, 5.8), (12.4, 10.6)], r, 1.2);
+                    pen.heavy(&[(12.4, 5.8), (7.6, 10.6)], r, 1.2);
+                }
+                "resolve" => pen.heavy(&[(6.5, 8.3), (9.0, 10.8), (13.5, 5.8)], pen.fam(Family::Green).solid, 1.3),
+                "nextComment" => pen.poly(&[(8.2, 5.5), (12.6, 8.2), (8.2, 10.9)], k.solid, Color32::TRANSPARENT),
+                _ => pen.poly(&[(11.8, 5.5), (7.4, 8.2), (11.8, 10.9)], k.solid, Color32::TRANSPARENT),
+            }
         }
         "showComments" => {
-            pen.rect(3.0, 3.0, 17.0, 17.0, c);
-            pen.frect(12.0, 3.0, 17.0, 17.0, a.linear_multiply(0.4));
-        }
-        "resolve" => {
-            pen.closed(&[(2.5, 3.5), (17.5, 3.5), (17.5, 13.5), (9.0, 13.5), (5.0, 17.0), (5.0, 13.5), (2.5, 13.5)], c);
-            pen.line_c(&[(6.5, 8.5), (9.0, 11.0), (13.5, 6.0)], green);
+            let k = pen.k;
+            pen.rr(3.0, 3.0, 17.0, 17.0, 1.8, pen.n.tint, k.ink);
+            pen.rr(11.5, 3.0, 17.0, 17.0, 1.8, k.solid, k.ink);
         }
         "trackChanges" => {
-            pen.page(4.0, 2.0, 16.0, 18.0);
-            pen.line_c(&[(6.0, 7.0), (14.0, 7.0)], red);
-            pen.line_c(&[(6.0, 11.0), (14.0, 11.0)], a);
-            pen.lines(6.0, 11.0, &[15.0]);
+            pen.sheet(4.0, 2.0, 16.0, 18.0);
+            pen.heavy(&[(6.5, 7.5), (13.5, 7.5)], pen.fam(Family::Red).solid, 1.1);
+            pen.heavy(&[(6.5, 11.0), (13.5, 11.0)], pen.k.solid, 1.1);
+            pen.rows(6.5, 11.0, &[14.5], pen.n.ink);
         }
         "markup" | "reviewingPane" => {
-            pen.page(4.0, 2.0, 16.0, 18.0);
-            pen.line_c(&[(6.0, 8.0), (13.0, 8.0)], red);
-            pen.lines(6.0, 13.0, &[12.0]);
+            pen.sheet(4.0, 2.0, 16.0, 18.0);
+            pen.heavy(&[(6.5, 8.0), (13.0, 8.0)], pen.k.solid, 1.1);
+            pen.rows(6.5, 13.0, &[12.0, 14.8], pen.n.ink);
         }
         "accept" => {
-            pen.page(4.0, 2.0, 15.0, 17.0);
-            pen.line_c(&[(10.0, 14.5), (12.5, 17.0), (18.0, 11.0)], green);
+            let g = pen.k;
+            pen.sheet(3.0, 2.0, 13.0, 15.0);
+            pen.disc(14.5, 14.5, 4.5, g.solid, Color32::TRANSPARENT);
+            pen.seg(&[(12.4, 14.6), (14.0, 16.2), (16.8, 13.0)], pen.n.tint);
         }
         "reject" => {
-            pen.page(4.0, 2.0, 15.0, 17.0);
-            pen.line_c(&[(11.0, 12.0), (17.0, 18.0)], red);
-            pen.line_c(&[(17.0, 12.0), (11.0, 18.0)], red);
+            let r = pen.k;
+            pen.sheet(3.0, 2.0, 13.0, 15.0);
+            pen.disc(14.5, 14.5, 4.5, r.solid, Color32::TRANSPARENT);
+            pen.seg(&[(12.8, 12.8), (16.2, 16.2)], pen.n.tint);
+            pen.seg(&[(16.2, 12.8), (12.8, 16.2)], pen.n.tint);
         }
         "prevChange" | "nextChange" => {
-            pen.page(4.0, 2.0, 16.0, 18.0);
-            let pts: &[(f32, f32)] =
-                if name == "nextChange" { &[(8.5, 7.0), (11.5, 10.0), (8.5, 13.0)] } else { &[(11.5, 7.0), (8.5, 10.0), (11.5, 13.0)] };
-            pen.line_c(pts, a);
+            pen.sheet(4.0, 2.0, 16.0, 18.0);
+            let tri: [(f32, f32); 3] =
+                if name == "nextChange" { [(8.0, 7.0), (12.5, 10.5), (8.0, 14.0)] } else { [(12.0, 7.0), (7.5, 10.5), (12.0, 14.0)] };
+            pen.poly(&tri, pen.k.solid, Color32::TRANSPARENT);
         }
         "compare" | "combine" => {
-            pen.page(2.0, 3.0, 10.0, 15.0);
-            pen.page(10.0, 5.0, 18.0, 17.0);
-            pen.line_c(&[(6.0, 18.5), (14.0, 18.5)], a);
+            let k = pen.k;
+            pen.sheet(2.0, 2.5, 10.0, 14.5);
+            pen.sheet(10.0, 4.5, 18.0, 16.5);
+            pen.heavy(&[(5.5, 18.6), (14.5, 18.6)], k.solid, 1.1);
         }
         "protect" | "restrict" | "blockAuthors" => {
-            pen.rect(5.0, 9.0, 15.0, 17.5, c);
-            pen.line_c(&[(7.0, 9.0), (7.0, 6.0), (10.0, 3.0), (13.0, 6.0), (13.0, 9.0)], a);
+            let k = pen.k;
+            pen.seg(&[(7.0, 9.0), (7.0, 6.0), (10.0, 3.0), (13.0, 6.0), (13.0, 9.0)], k.ink);
+            pen.rr(4.5, 8.5, 15.5, 17.5, 1.8, k.solid, k.ink);
+            pen.dot(10.0, 12.5, 1.3, pen.n.tint);
+            pen.seg(&[(10.0, 12.5), (10.0, 15.0)], pen.n.tint);
         }
         "hideInk" => {
-            pen.line_c(&[(3.0, 13.0), (6.0, 8.0), (9.0, 13.0), (12.0, 8.0)], a);
-            pen.line(&[(3.0, 3.0), (17.0, 17.0)]);
+            pen.heavy(&[(3.0, 13.0), (6.0, 8.0), (9.0, 13.0), (12.0, 8.0)], pen.k.solid, 1.1);
+            pen.heavy(&[(3.0, 3.0), (17.0, 17.0)], pen.fam(Family::Red).solid, 1.1);
         }
         // View
-        "readMode" => {
-            pen.closed(&[(2.0, 4.0), (9.5, 5.0), (9.5, 17.0), (2.0, 16.0)], c);
-            pen.closed(&[(18.0, 4.0), (10.5, 5.0), (10.5, 17.0), (18.0, 16.0)], a);
+        "readMode" | "immersive" => {
+            let k = pen.k;
+            pen.poly(&[(2.0, 4.0), (9.5, 5.0), (9.5, 17.0), (2.0, 16.0)], pen.n.tint, k.ink);
+            pen.poly(&[(18.0, 4.0), (10.5, 5.0), (10.5, 17.0), (18.0, 16.0)], k.tint, k.ink);
+            if name == "immersive" {
+                pen.dot(14.2, 10.5, 2.2, k.solid);
+            } else {
+                pen.rows(4.0, 8.0, &[8.0, 10.5, 13.0], k.ink);
+                pen.rows(12.0, 16.0, &[8.0, 10.5, 13.0], k.solid);
+            }
         }
         "printLayout" => {
-            pen.page(4.0, 2.0, 16.0, 18.0);
-            pen.lines(6.0, 14.0, &[7.0, 10.0, 13.0]);
+            pen.sheet(4.0, 2.0, 16.0, 18.0);
+            pen.rows(6.5, 13.5, &[7.5, 10.5], pen.k.solid);
+            pen.rows(6.5, 11.0, &[13.5], pen.n.ink);
         }
         "webLayout" => {
-            pen.circle(10.0, 10.0, 7.0, c);
-            pen.line_c(&[(3.0, 10.0), (17.0, 10.0)], a);
-            pen.line_c(&[(10.0, 3.0), (7.0, 10.0), (10.0, 17.0)], a);
-            pen.line_c(&[(10.0, 3.0), (13.0, 10.0), (10.0, 17.0)], a);
+            let k = pen.k;
+            pen.disc(10.0, 10.0, 7.2, k.tint, k.ink);
+            pen.seg(&[(3.0, 10.0), (17.0, 10.0)], k.solid);
+            pen.seg(&[(10.0, 3.0), (7.0, 10.0), (10.0, 17.0)], k.solid);
+            pen.seg(&[(10.0, 3.0), (13.0, 10.0), (10.0, 17.0)], k.solid);
         }
         "outline" => {
-            pen.fcircle(4.0, 4.5, 1.2, a);
-            pen.line(&[(6.5, 4.5), (17.0, 4.5)]);
-            pen.fcircle(7.0, 10.0, 1.2, a);
-            pen.line(&[(9.5, 10.0), (17.0, 10.0)]);
-            pen.fcircle(10.0, 15.5, 1.2, a);
-            pen.line(&[(12.5, 15.5), (17.0, 15.5)]);
+            let k = pen.k;
+            for (x, y) in [(4.0, 4.5), (7.0, 10.0), (10.0, 15.5)] {
+                pen.dot(x, y, 1.5, k.solid);
+                pen.seg(&[(x + 2.8, y), (17.0, y)], k.ink);
+            }
         }
-        "draft" => pen.lines(3.0, 17.0, &[4.0, 7.0, 10.0, 13.0, 16.0]),
+        "draft" => {
+            pen.rows(3.0, 17.0, &[4.0, 7.0, 10.0, 13.0], pen.k.ink);
+            pen.rows(3.0, 11.0, &[16.0], pen.k.solid);
+        }
         "focus" => {
-            pen.line(&[(3.0, 7.0), (3.0, 3.0), (7.0, 3.0)]);
-            pen.line(&[(13.0, 3.0), (17.0, 3.0), (17.0, 7.0)]);
-            pen.line(&[(17.0, 13.0), (17.0, 17.0), (13.0, 17.0)]);
-            pen.line(&[(7.0, 17.0), (3.0, 17.0), (3.0, 13.0)]);
-            pen.lines(7.0, 13.0, &[8.5, 11.5]);
-        }
-        "immersive" => {
-            pen.closed(&[(2.0, 4.0), (9.5, 5.0), (9.5, 17.0), (2.0, 16.0)], c);
-            pen.closed(&[(18.0, 4.0), (10.5, 5.0), (10.5, 17.0), (18.0, 16.0)], c);
-            pen.fcircle(14.0, 10.0, 2.0, a);
+            let k = pen.k;
+            pen.seg(&[(3.0, 7.0), (3.0, 3.0), (7.0, 3.0)], k.ink);
+            pen.seg(&[(13.0, 3.0), (17.0, 3.0), (17.0, 7.0)], k.ink);
+            pen.seg(&[(17.0, 13.0), (17.0, 17.0), (13.0, 17.0)], k.ink);
+            pen.seg(&[(7.0, 17.0), (3.0, 17.0), (3.0, 13.0)], k.ink);
+            pen.rows(7.0, 13.0, &[8.5, 11.5], k.solid);
         }
         "vertical" => {
-            pen.page(5.0, 1.0, 15.0, 9.0);
-            pen.page(5.0, 11.0, 15.0, 19.0);
+            pen.sheet(5.0, 1.0, 15.0, 9.0);
+            pen.sheet(5.0, 11.0, 15.0, 19.0);
+            pen.poly(&[(16.5, 8.5), (19.0, 8.5), (17.75, 11.5)], pen.k.solid, Color32::TRANSPARENT);
         }
-        "sideToSide" => {
-            pen.page(1.5, 4.0, 9.5, 16.0);
-            pen.page(10.5, 4.0, 18.5, 16.0);
+        "sideToSide" | "multiplePages" => {
+            pen.sheet(1.5, 4.0, 9.5, 16.0);
+            pen.sheet(10.5, 4.0, 18.5, 16.0);
+            pen.rows(3.0, 7.0, &[9.0, 11.5], pen.k.solid);
+            pen.rows(12.0, 16.0, &[9.0, 11.5], pen.k.solid);
         }
         "ruler" => {
-            pen.rect(2.0, 7.0, 18.0, 13.0, c);
-            for x in [4.5, 7.0, 9.5, 12.0, 14.5] {
-                pen.line_c(&[(x, 7.0), (x, 10.0)], a);
+            let k = pen.k;
+            pen.rr(2.0, 6.5, 18.0, 13.5, 1.2, k.tint, k.ink);
+            for (i, x) in [4.5, 7.0, 9.5, 12.0, 14.5].into_iter().enumerate() {
+                pen.seg(&[(x, 6.5), (x, if i % 2 == 0 { 10.5 } else { 9.0 })], k.solid);
             }
         }
         "gridlines" => {
-            pen.rect(3.0, 3.0, 17.0, 17.0, c);
-            for k in [6.5, 10.0, 13.5] {
-                pen.line_c(&[(k, 3.0), (k, 17.0)], a.linear_multiply(0.6));
-                pen.line_c(&[(3.0, k), (17.0, k)], a.linear_multiply(0.6));
+            let k = pen.k;
+            pen.rr(3.0, 3.0, 17.0, 17.0, 1.6, pen.n.tint, k.ink);
+            for g in [6.5, 10.0, 13.5] {
+                pen.seg(&[(g, 3.5), (g, 16.5)], k.solid.gamma_multiply(0.7));
+                pen.seg(&[(3.5, g), (16.5, g)], k.solid.gamma_multiply(0.7));
             }
         }
         "navPane" => {
-            pen.rect(3.0, 3.0, 17.0, 17.0, c);
-            pen.frect(3.0, 3.0, 8.0, 17.0, a.linear_multiply(0.5));
+            let k = pen.k;
+            pen.rr(3.0, 3.0, 17.0, 17.0, 1.8, pen.n.tint, k.ink);
+            pen.rr(3.0, 3.0, 8.5, 17.0, 1.8, k.solid, k.ink);
         }
-        "zoom" => {
-            pen.circle(8.5, 8.5, 5.5, c);
-            pen.line_c(&[(12.5, 12.5), (17.5, 17.5)], a);
-            pen.line(&[(6.0, 8.5), (11.0, 8.5)]);
-            pen.line(&[(8.5, 6.0), (8.5, 11.0)]);
-        }
-        "zoomIn" | "zoomOut" => {
-            pen.circle(8.5, 8.5, 5.5, c);
-            pen.line_c(&[(12.5, 12.5), (17.5, 17.5)], a);
-            pen.line(&[(6.0, 8.5), (11.0, 8.5)]);
-            if name == "zoomIn" {
-                pen.line(&[(8.5, 6.0), (8.5, 11.0)]);
+        "zoom" | "zoomIn" | "zoomOut" => {
+            let k = pen.k;
+            pen.heavy(&[(12.5, 12.5), (17.2, 17.2)], k.solid, 2.0);
+            pen.disc(8.5, 8.5, 5.6, k.tint, k.ink);
+            pen.seg(&[(6.0, 8.5), (11.0, 8.5)], k.ink);
+            if name != "zoomOut" {
+                pen.seg(&[(8.5, 6.0), (8.5, 11.0)], k.ink);
             }
         }
-        "zoom100" => pen.text(10.0, 10.0, 7.5, "100", a, true),
-        "onePage" => pen.page(5.0, 2.0, 15.0, 18.0),
-        "multiplePages" => {
-            pen.page(1.5, 4.0, 9.5, 16.0);
-            pen.page(10.5, 4.0, 18.5, 16.0);
+        "zoom100" => {
+            pen.rr(2.0, 5.0, 18.0, 15.0, 2.5, pen.k.tint, pen.k.ink);
+            pen.text(10.0, 10.0, 7.5, "100", pen.k.solid, true);
+        }
+        "onePage" => {
+            pen.sheet(5.0, 2.0, 15.0, 18.0);
+            pen.rows(7.0, 13.0, &[8.0, 10.5, 13.0], pen.k.solid);
         }
         "pageWidth" => {
-            pen.page(4.0, 2.0, 16.0, 18.0);
-            pen.line_c(&[(1.5, 10.0), (18.5, 10.0)], a);
+            let k = pen.k;
+            pen.sheet(4.0, 2.0, 16.0, 18.0);
+            pen.heavy(&[(4.5, 10.0), (15.5, 10.0)], k.solid, 1.0);
+            pen.poly(&[(4.5, 7.8), (1.2, 10.0), (4.5, 12.2)], k.solid, Color32::TRANSPARENT);
+            pen.poly(&[(15.5, 7.8), (18.8, 10.0), (15.5, 12.2)], k.solid, Color32::TRANSPARENT);
         }
         "darkMode" => {
-            pen.fcircle(10.0, 10.0, 7.0, c);
-            pen.fcircle(13.0, 8.0, 6.0, Color32::from_rgba_unmultiplied(255, 255, 255, 230));
+            let k = pen.k;
+            pen.disc(10.0, 10.0, 7.0, k.solid, Color32::TRANSPARENT);
+            pen.disc(13.0, 8.0, 5.8, if pen.mono { Color32::TRANSPARENT } else { pen.n.tint }, Color32::TRANSPARENT);
+            pen.dot(16.0, 15.0, 0.9, pen.fam(Family::Amber).solid);
+            pen.dot(5.5, 4.0, 0.7, pen.fam(Family::Amber).solid);
         }
         "interfaceTheme" => {
             // A window, its right half dark: light, dark or both (follow the system).
-            pen.frect(10.0, 3.5, 17.5, 16.5, c);
-            pen.rect(2.5, 3.5, 17.5, 16.5, c);
-            pen.line_c(&[(2.5, 6.5), (10.0, 6.5)], a);
+            let k = pen.k;
+            pen.rr(2.5, 3.5, 17.5, 16.5, 1.8, pen.n.tint, k.ink);
+            pen.rr(10.0, 3.5, 17.5, 16.5, 1.8, k.ink, k.ink);
+            pen.rr(2.5, 3.5, 17.5, 6.5, 1.8, k.solid, k.ink);
         }
         "newWindow" => {
-            pen.rect(2.5, 5.0, 13.0, 15.0, c);
-            pen.rect(7.0, 2.5, 17.5, 12.5, a);
+            let k = pen.k;
+            pen.rr(2.5, 5.0, 13.0, 15.5, 1.5, pen.n.tint, k.ink);
+            pen.rr(7.0, 2.5, 17.5, 12.5, 1.5, k.tint, k.ink);
+            pen.rr(7.0, 2.5, 17.5, 5.2, 1.5, k.solid, k.ink);
         }
         "arrangeAll" => {
-            pen.rect(3.0, 2.5, 17.0, 9.0, c);
-            pen.rect(3.0, 11.0, 17.0, 17.5, a);
+            let k = pen.k;
+            pen.rr(3.0, 2.5, 17.0, 9.0, 1.4, k.tint, k.ink);
+            pen.rr(3.0, 11.0, 17.0, 17.5, 1.4, k.solid, k.ink);
         }
         "split" => {
-            pen.rect(3.0, 3.0, 17.0, 17.0, c);
-            pen.line_c(&[(3.0, 10.0), (17.0, 10.0)], a);
+            let k = pen.k;
+            pen.rr(3.0, 3.0, 17.0, 17.0, 1.8, k.tint, k.ink);
+            pen.heavy(&[(3.0, 10.0), (17.0, 10.0)], k.solid, 1.2);
         }
         "fullScreen" => {
             // A screen with arrows out to its four corners.
-            pen.rect(2.0, 3.5, 18.0, 16.5, c);
-            pen.line_c(&[(5.0, 8.5), (5.0, 6.0), (7.5, 6.0)], a);
-            pen.line_c(&[(12.5, 6.0), (15.0, 6.0), (15.0, 8.5)], a);
-            pen.line_c(&[(15.0, 11.5), (15.0, 14.0), (12.5, 14.0)], a);
-            pen.line_c(&[(7.5, 14.0), (5.0, 14.0), (5.0, 11.5)], a);
-            pen.line_c(&[(5.0, 6.0), (8.0, 8.5)], a);
-            pen.line_c(&[(15.0, 6.0), (12.0, 8.5)], a);
-            pen.line_c(&[(15.0, 14.0), (12.0, 11.5)], a);
-            pen.line_c(&[(5.0, 14.0), (8.0, 11.5)], a);
+            let k = pen.k;
+            pen.rr(2.0, 3.5, 18.0, 16.5, 1.8, k.tint, k.ink);
+            for (cx, cy, dx, dy) in [(5.0, 6.5, 1.0, 1.0), (15.0, 6.5, -1.0, 1.0), (15.0, 13.5, -1.0, -1.0), (5.0, 13.5, 1.0, -1.0)] {
+                pen.seg(&[(cx + 2.5 * dx, cy), (cx, cy), (cx, cy + 2.5 * dy)], k.solid);
+                pen.seg(&[(cx, cy), (cx + 3.0 * dx, cy + 2.4 * dy)], k.solid);
+            }
         }
         "sideBySide" | "syncScroll" | "switchWindows" => {
-            pen.rect(2.0, 4.0, 9.5, 16.0, c);
-            pen.rect(10.5, 4.0, 18.0, 16.0, a);
+            let k = pen.k;
+            pen.rr(2.0, 4.0, 9.5, 16.0, 1.4, pen.n.tint, k.ink);
+            pen.rr(10.5, 4.0, 18.0, 16.0, 1.4, k.tint, k.ink);
+            pen.rr(10.5, 4.0, 18.0, 6.5, 1.4, k.solid, k.ink);
+            pen.rr(2.0, 4.0, 9.5, 6.5, 1.4, k.solid, k.ink);
         }
         "macros" => {
-            pen.rect(3.0, 3.0, 17.0, 17.0, c);
-            pen.fill(&[(8.0, 6.5), (8.0, 13.5), (14.0, 10.0)], a);
+            let k = pen.k;
+            pen.rr(3.0, 3.0, 17.0, 17.0, 2.0, k.tint, k.ink);
+            pen.poly(&[(8.0, 6.5), (8.0, 13.5), (14.0, 10.0)], k.solid, Color32::TRANSPARENT);
         }
         // A page with a filled band at the top and a style mark: the document's template.
         "documentTemplate" => {
-            pen.page(4.0, 2.0, 16.0, 18.0);
-            pen.frect(6.0, 5.0, 11.5, 7.0, a);
-            pen.text(10.0, 13.0, 8.0, "A", a, false);
+            pen.sheet(4.0, 2.0, 16.0, 18.0);
+            pen.rr(6.0, 4.8, 11.5, 7.2, 0.6, pen.k.solid, Color32::TRANSPARENT);
+            pen.text(10.0, 12.8, 8.5, "A", pen.k.solid, true);
         }
         "properties" | "info" => {
             let (bg, fg) = pen.badge();
@@ -1435,71 +1436,85 @@ fn art(pen: &Pen, name: &str) -> bool {
         }
         // Table tools
         "insertAbove" | "insertBelow" | "insertLeft" | "insertRight" => {
-            pen.rect(3.0, 3.0, 17.0, 17.0, c);
+            let (k, n) = (pen.k, pen.n);
+            pen.rr(3.0, 3.0, 17.0, 17.0, 1.6, n.tint, k.ink);
+            pen.seg(&[(10.0, 3.5), (10.0, 16.5)], n.ink);
+            pen.seg(&[(3.5, 10.0), (16.5, 10.0)], n.ink);
             match name {
-                "insertAbove" => pen.frect(3.0, 3.0, 17.0, 8.0, a),
-                "insertBelow" => pen.frect(3.0, 12.0, 17.0, 17.0, a),
-                "insertLeft" => pen.frect(3.0, 3.0, 8.0, 17.0, a),
-                _ => pen.frect(12.0, 3.0, 17.0, 17.0, a),
+                "insertAbove" => pen.rr(3.0, 3.0, 17.0, 8.0, 1.6, k.solid, k.ink),
+                "insertBelow" => pen.rr(3.0, 12.0, 17.0, 17.0, 1.6, k.solid, k.ink),
+                "insertLeft" => pen.rr(3.0, 3.0, 8.0, 17.0, 1.6, k.solid, k.ink),
+                _ => pen.rr(12.0, 3.0, 17.0, 17.0, 1.6, k.solid, k.ink),
             }
         }
         "deleteTable" => {
-            pen.rect(3.0, 3.0, 15.0, 15.0, c);
-            pen.line(&[(3.0, 9.0), (15.0, 9.0)]);
-            pen.line(&[(9.0, 3.0), (9.0, 15.0)]);
-            pen.line_c(&[(12.0, 12.0), (18.0, 18.0)], red);
-            pen.line_c(&[(18.0, 12.0), (12.0, 18.0)], red);
+            let k = pen.k;
+            pen.rr(2.5, 2.5, 14.5, 14.5, 1.4, pen.n.tint, pen.n.ink);
+            pen.seg(&[(2.5, 8.5), (14.5, 8.5)], pen.n.ink);
+            pen.seg(&[(8.5, 2.5), (8.5, 14.5)], pen.n.ink);
+            pen.disc(14.5, 14.5, 4.2, k.solid, Color32::TRANSPARENT);
+            pen.seg(&[(12.9, 12.9), (16.1, 16.1)], pen.n.tint);
+            pen.seg(&[(16.1, 12.9), (12.9, 16.1)], pen.n.tint);
         }
-        "merge" => {
-            pen.rect(3.0, 5.0, 17.0, 15.0, c);
-            pen.line_c(&[(5.0, 10.0), (15.0, 10.0)], a);
-            pen.line_c(&[(7.0, 8.0), (5.0, 10.0), (7.0, 12.0)], a);
-            pen.line_c(&[(13.0, 8.0), (15.0, 10.0), (13.0, 12.0)], a);
+        "merge" | "autofit" | "distributeRows" | "distributeCols" | "rowHeight" | "colWidth" => {
+            let k = pen.k;
+            pen.rr(2.5, 4.5, 17.5, 15.5, 1.6, k.tint, k.ink);
+            pen.heavy(&[(6.5, 10.0), (13.5, 10.0)], k.solid, 1.0);
+            pen.poly(&[(7.0, 7.4), (3.8, 10.0), (7.0, 12.6)], k.solid, Color32::TRANSPARENT);
+            pen.poly(&[(13.0, 7.4), (16.2, 10.0), (13.0, 12.6)], k.solid, Color32::TRANSPARENT);
         }
         "splitCells" | "splitTable" => {
-            pen.rect(3.0, 5.0, 17.0, 15.0, c);
-            pen.line_c(&[(10.0, 5.0), (10.0, 15.0)], a);
-        }
-        "autofit" | "distributeRows" | "distributeCols" | "rowHeight" | "colWidth" => {
-            pen.rect(3.0, 4.0, 17.0, 16.0, c);
-            pen.line_c(&[(5.0, 10.0), (15.0, 10.0)], a);
-            pen.line_c(&[(7.0, 8.0), (5.0, 10.0), (7.0, 12.0)], a);
-            pen.line_c(&[(13.0, 8.0), (15.0, 10.0), (13.0, 12.0)], a);
+            let k = pen.k;
+            pen.rr(2.5, 4.5, 17.5, 15.5, 1.6, k.tint, k.ink);
+            pen.heavy(&[(10.0, 4.5), (10.0, 15.5)], k.solid, 1.2);
         }
         "cellAlign" => {
-            pen.rect(3.0, 3.0, 17.0, 17.0, c);
-            pen.lines(6.0, 14.0, &[8.5, 11.5]);
+            let k = pen.k;
+            pen.rr(3.0, 3.0, 17.0, 17.0, 1.6, k.tint, k.ink);
+            pen.rows(6.0, 14.0, &[8.5, 11.5], k.solid);
         }
         "textDirection" => {
-            pen.text(9.0, 10.0, 10.0, "A", c, false);
-            pen.line_c(&[(15.5, 4.0), (15.5, 16.0)], a);
-            pen.line_c(&[(13.5, 14.0), (15.5, 16.0), (17.5, 14.0)], a);
+            let k = pen.k;
+            pen.text(8.5, 10.0, 11.0, "A", k.ink, false);
+            pen.heavy(&[(15.5, 4.0), (15.5, 13.5)], k.solid, 1.1);
+            pen.poly(&[(13.0, 13.0), (18.0, 13.0), (15.5, 17.0)], k.solid, Color32::TRANSPARENT);
         }
         "cellMargins" => {
-            pen.rect(3.0, 3.0, 17.0, 17.0, c);
-            pen.rect(6.0, 6.0, 14.0, 14.0, a);
+            let k = pen.k;
+            pen.rr(3.0, 3.0, 17.0, 17.0, 1.6, k.tint, k.ink);
+            pen.rr(6.0, 6.0, 14.0, 14.0, 1.0, pen.n.tint, k.solid);
         }
         "repeatHeader" => {
-            pen.frect(3.0, 3.0, 17.0, 7.0, a);
-            pen.rect(3.0, 3.0, 17.0, 17.0, c);
-            pen.line(&[(3.0, 12.0), (17.0, 12.0)]);
+            let k = pen.k;
+            pen.rr(3.0, 3.0, 17.0, 17.0, 1.6, pen.n.tint, k.ink);
+            pen.rr(3.0, 3.0, 17.0, 7.5, 1.6, k.solid, k.ink);
+            pen.rr(3.0, 11.0, 17.0, 13.5, 0.4, k.tint, Color32::TRANSPARENT);
         }
         "toText" => {
-            pen.rect(3.0, 3.0, 11.0, 11.0, c);
-            pen.lines(9.0, 17.0, &[14.0, 17.0]);
+            let k = pen.k;
+            pen.rr(2.5, 2.5, 11.0, 11.0, 1.2, k.tint, k.ink);
+            pen.seg(&[(2.5, 6.75), (11.0, 6.75)], k.ink);
+            pen.seg(&[(6.75, 2.5), (6.75, 11.0)], k.ink);
+            pen.rows(9.0, 17.5, &[14.5], k.solid);
+            pen.rows(9.0, 14.0, &[17.5], k.solid);
         }
-        "formula" => pen.text(10.0, 10.0, 12.0, "fx", a, false),
+        "formula" => pen.text(10.0, 10.0, 12.5, "fx", pen.k.solid, false),
         "selectTable" => {
-            pen.rect(3.0, 3.0, 17.0, 17.0, c);
-            pen.fill(&[(8.0, 7.0), (8.0, 15.0), (10.0, 13.0), (11.5, 16.0), (12.5, 15.5), (11.0, 12.5), (13.5, 12.5)], a);
+            let k = pen.k;
+            pen.rr(3.0, 3.0, 17.0, 17.0, 1.6, k.tint, k.ink);
+            pen.poly(&[(8.0, 6.5), (8.0, 15.0), (10.0, 13.0), (13.5, 12.5)], k.solid, Color32::TRANSPARENT);
+            pen.poly(&[(10.0, 13.0), (11.2, 12.6), (12.8, 15.8), (11.6, 16.3)], k.solid, Color32::TRANSPARENT);
         }
         "draw" => {
-            pen.rect(3.0, 3.0, 13.0, 13.0, c);
-            pen.line_c(&[(10.0, 17.0), (17.0, 10.0)], a);
+            let k = pen.k;
+            pen.rr(2.5, 2.5, 13.0, 13.0, 1.4, pen.n.tint, pen.n.ink);
+            pen.heavy(&[(9.5, 17.5), (17.5, 9.5)], k.solid, 1.3);
         }
         "borderPainter" => {
-            pen.line(&[(4.0, 16.0), (14.0, 6.0), (16.0, 8.0), (6.0, 18.0), (3.5, 18.5), (4.0, 16.0)]);
-            pen.line_c(&[(3.0, 3.0), (11.0, 3.0)], a);
+            let (k, n) = (pen.k, pen.n);
+            pen.poly(&[(4.0, 16.0), (14.0, 6.0), (16.0, 8.0), (6.0, 18.0)], n.tint, n.ink);
+            pen.poly(&[(4.0, 16.0), (6.0, 18.0), (3.0, 19.0)], n.ink, Color32::TRANSPARENT);
+            pen.heavy(&[(2.5, 3.0), (11.5, 3.0)], k.solid, 1.3);
         }
         // Chrome
         "save" => {
@@ -1566,7 +1581,7 @@ fn art(pen: &Pen, name: &str) -> bool {
         }
         // A triangle filling most of its box: it is drawn at 9–12 pt beside combos and split
         // buttons, where a smaller one shrank to a dot (#535).
-        "dropdown" => pen.fill(&[(3.0, 7.0), (17.0, 7.0), (10.0, 14.0)], c),
+        "dropdown" => pen.poly(&[(3.0, 7.0), (17.0, 7.0), (10.0, 14.0)], pen.n.ink, Color32::TRANSPARENT),
         "more" => {
             for x in [5.0, 10.0, 15.0] {
                 pen.dot(x, 10.0, 1.5, pen.n.ink);
@@ -1596,32 +1611,33 @@ fn art(pen: &Pen, name: &str) -> bool {
         "chevronUp" => pen.seg(&[(4.5, 12.5), (10.0, 7.0), (15.5, 12.5)], pen.n.ink),
         "chevronDown" => pen.seg(&[(4.5, 7.5), (10.0, 13.0), (15.5, 7.5)], pen.n.ink),
         // Read Aloud player
-        "mediaPlay" => pen.fill(&[(6.0, 4.0), (16.0, 10.0), (6.0, 16.0)], c),
+        "mediaPlay" => pen.poly(&[(6.0, 4.0), (16.0, 10.0), (6.0, 16.0)], pen.k.solid, Color32::TRANSPARENT),
         "mediaPause" => {
-            pen.frect(5.5, 4.0, 8.5, 16.0, c);
-            pen.frect(11.5, 4.0, 14.5, 16.0, c);
+            pen.rr(5.0, 4.0, 8.5, 16.0, 1.0, pen.k.solid, Color32::TRANSPARENT);
+            pen.rr(11.5, 4.0, 15.0, 16.0, 1.0, pen.k.solid, Color32::TRANSPARENT);
         }
-        "mediaStop" => pen.frect(5.0, 5.0, 15.0, 15.0, c),
+        "mediaStop" => pen.rr(5.0, 5.0, 15.0, 15.0, 1.8, pen.k.solid, Color32::TRANSPARENT),
         "mediaPrev" => {
-            pen.frect(4.0, 5.0, 6.0, 15.0, c);
-            pen.fill(&[(16.0, 5.0), (7.0, 10.0), (16.0, 15.0)], c);
+            pen.rr(3.8, 5.0, 6.0, 15.0, 0.6, pen.k.solid, Color32::TRANSPARENT);
+            pen.poly(&[(16.0, 5.0), (7.0, 10.0), (16.0, 15.0)], pen.k.solid, Color32::TRANSPARENT);
         }
         "mediaNext" => {
-            pen.frect(14.0, 5.0, 16.0, 15.0, c);
-            pen.fill(&[(4.0, 5.0), (13.0, 10.0), (4.0, 15.0)], c);
+            pen.rr(14.0, 5.0, 16.2, 15.0, 0.6, pen.k.solid, Color32::TRANSPARENT);
+            pen.poly(&[(4.0, 5.0), (13.0, 10.0), (4.0, 15.0)], pen.k.solid, Color32::TRANSPARENT);
         }
         // Move past citation: a bracketed citation with an arrow hopping over it to the caret.
         "pastCitation" => {
-            pen.line_c(&[(4.5, 9.0), (3.0, 9.0), (3.0, 17.0), (4.5, 17.0)], c);
-            pen.line_c(&[(11.5, 9.0), (13.0, 9.0), (13.0, 17.0), (11.5, 17.0)], c);
-            pen.lines(5.5, 10.5, &[12.0, 14.5]);
-            pen.line_c(&[(4.0, 6.0), (8.0, 2.5), (14.0, 2.5), (16.5, 7.0)], a);
-            pen.line_c(&[(14.0, 6.0), (16.5, 7.0), (17.5, 4.5)], a);
-            pen.line_c(&[(17.0, 9.0), (17.0, 17.5)], a);
+            let k = pen.k;
+            pen.seg(&[(4.5, 9.0), (3.0, 9.0), (3.0, 17.0), (4.5, 17.0)], k.ink);
+            pen.seg(&[(11.5, 9.0), (13.0, 9.0), (13.0, 17.0), (11.5, 17.0)], k.ink);
+            pen.rows(5.5, 10.5, &[12.0, 14.5], k.ink);
+            pen.heavy(&[(4.0, 6.0), (8.0, 2.8), (13.5, 2.8), (15.8, 5.6)], k.solid, 1.0);
+            pen.poly(&[(13.6, 5.8), (17.4, 7.6), (17.0, 3.6)], k.solid, Color32::TRANSPARENT);
+            pen.heavy(&[(17.0, 9.5), (17.0, 17.5)], k.solid, 1.0);
         }
         "chevronDoubleRight" => {
-            pen.line(&[(4.0, 4.0), (9.0, 10.0), (4.0, 16.0)]);
-            pen.line(&[(11.0, 4.0), (16.0, 10.0), (11.0, 16.0)]);
+            pen.seg(&[(4.5, 4.5), (9.5, 10.0), (4.5, 15.5)], pen.n.ink);
+            pen.seg(&[(10.5, 4.5), (15.5, 10.0), (10.5, 15.5)], pen.n.ink);
         }
         "addins" => {
             let k = pen.k;
@@ -1632,9 +1648,11 @@ fn art(pen: &Pen, name: &str) -> bool {
             pen.heavy(&[(11.0, 14.25), (17.5, 14.25)], k.solid, 1.2);
         }
         "discord" => {
-            pen.fill(&[(3.0, 6.0), (7.0, 3.5), (13.0, 3.5), (17.0, 6.0), (17.5, 14.0), (13.5, 16.5), (6.5, 16.5), (2.5, 14.0)], a);
-            pen.fcircle(7.5, 10.5, 1.5, Color32::WHITE);
-            pen.fcircle(12.5, 10.5, 1.5, Color32::WHITE);
+            // A game-pad-shaped face (original mark, not the Discord logo).
+            let (bg, fg) = pen.badge();
+            pen.poly(&[(3.0, 6.0), (7.0, 3.5), (13.0, 3.5), (17.0, 6.0), (17.5, 14.0), (13.5, 16.5), (6.5, 16.5), (2.5, 14.0)], bg, pen.k.ink);
+            pen.dot(7.5, 10.5, 1.6, fg);
+            pen.dot(12.5, 10.5, 1.6, fg);
         }
         // Open: a folder with its flap lifted.
         "open" => {
@@ -1653,21 +1671,23 @@ fn art(pen: &Pen, name: &str) -> bool {
         }
         "alignText" => {
             // A box with its text lines in the middle, arrows to the top and bottom edges.
-            pen.rect(3.0, 2.5, 17.0, 17.5, c);
-            pen.lines(5.5, 11.0, &[9.0, 11.5]);
-            pen.line_c(&[(14.0, 5.0), (14.0, 15.0)], a);
-            pen.line_c(&[(12.5, 6.5), (14.0, 5.0), (15.5, 6.5)], a);
-            pen.line_c(&[(12.5, 13.5), (14.0, 15.0), (15.5, 13.5)], a);
+            let k = pen.k;
+            pen.rr(3.0, 2.5, 17.0, 17.5, 1.6, k.tint, k.ink);
+            pen.rows(5.5, 10.5, &[9.0, 11.5], k.ink);
+            pen.heavy(&[(14.0, 6.0), (14.0, 14.0)], k.solid, 1.0);
+            pen.poly(&[(12.0, 6.8), (16.0, 6.8), (14.0, 4.2)], k.solid, Color32::TRANSPARENT);
+            pen.poly(&[(12.0, 13.2), (16.0, 13.2), (14.0, 15.8)], k.solid, Color32::TRANSPARENT);
         }
         "textBoxLink" | "textBoxUnlink" => {
             // Two boxes, the text running from the first into the second (broken: cut through).
-            pen.rect(2.0, 3.0, 8.5, 11.0, c);
-            pen.rect(11.5, 9.0, 18.0, 17.0, c);
-            pen.lines(3.5, 7.0, &[5.5, 8.0]);
-            pen.line_c(&[(5.0, 11.0), (5.0, 14.0), (11.5, 14.0)], a);
-            pen.line_c(&[(9.5, 12.5), (11.5, 14.0), (9.5, 15.5)], a);
+            let k = pen.k;
+            pen.rr(2.0, 3.0, 8.5, 11.0, 1.2, k.tint, k.ink);
+            pen.rr(11.5, 9.0, 18.0, 17.0, 1.2, k.tint, k.ink);
+            pen.rows(3.8, 6.8, &[5.5, 8.0], k.ink);
+            pen.heavy(&[(5.0, 11.0), (5.0, 14.0), (10.0, 14.0)], k.solid, 1.0);
+            pen.poly(&[(9.5, 12.0), (12.0, 14.0), (9.5, 16.0)], k.solid, Color32::TRANSPARENT);
             if name == "textBoxUnlink" {
-                pen.line_c(&[(6.5, 16.5), (9.0, 11.5)], c);
+                pen.heavy(&[(6.2, 16.8), (9.0, 11.2)], pen.fam(Family::Red).solid, 1.1);
             }
         }
 
@@ -1694,41 +1714,45 @@ fn art(pen: &Pen, name: &str) -> bool {
 
         // Outlining tab: arrows moving a paragraph between outline levels and along the outline.
         "outlinePromote" | "outlineDemote" => {
-            pen.lines(9.0, 17.0, &[6.0, 10.0, 14.0]);
+            let k = pen.k;
+            pen.rows(9.5, 17.0, &[6.0, 10.0, 14.0], k.ink);
             if name == "outlinePromote" {
-                pen.line_c(&[(7.0, 10.0), (2.5, 10.0)], a);
-                pen.line_c(&[(5.0, 7.5), (2.5, 10.0), (5.0, 12.5)], a);
+                pen.poly(&[(7.0, 7.0), (7.0, 13.0), (2.5, 10.0)], k.solid, Color32::TRANSPARENT);
             } else {
-                pen.line_c(&[(2.5, 10.0), (7.0, 10.0)], a);
-                pen.line_c(&[(4.5, 7.5), (7.0, 10.0), (4.5, 12.5)], a);
+                pen.poly(&[(2.5, 7.0), (2.5, 13.0), (7.0, 10.0)], k.solid, Color32::TRANSPARENT);
             }
         }
         "outlineTop" | "outlineBody" => {
-            pen.lines(11.0, 17.0, &[6.0, 10.0, 14.0]);
-            let (x, d) = if name == "outlineTop" { (3.0, 1.0) } else { (9.0, -1.0) };
-            for k in [0.0, 3.5] {
-                pen.line_c(&[(x + d * k + d * 2.5, 7.0), (x + d * k, 10.0), (x + d * k + d * 2.5, 13.0)], a);
+            let k = pen.k;
+            pen.rows(11.5, 17.0, &[6.0, 10.0, 14.0], k.ink);
+            let (x, d) = if name == "outlineTop" { (3.0, 1.0) } else { (9.5, -1.0) };
+            for o in [0.0, 3.5] {
+                pen.poly(&[(x + d * o + d * 3.0, 7.0), (x + d * o, 10.0), (x + d * o + d * 3.0, 13.0)], k.solid, Color32::TRANSPARENT);
             }
         }
         "outlineUp" | "outlineDown" => {
-            pen.lines(3.0, 11.0, &[6.0, 10.0, 14.0]);
+            let k = pen.k;
+            pen.rows(3.0, 11.0, &[6.0, 10.0, 14.0], k.ink);
             let up = name == "outlineUp";
-            let (tip, tail) = if up { (3.0, 17.0) } else { (17.0, 3.0) };
-            pen.line_c(&[(15.0, tail), (15.0, tip)], a);
-            let wing = if up { tip + 3.0 } else { tip - 3.0 };
-            pen.line_c(&[(12.0, wing), (15.0, tip), (18.0, wing)], a);
+            let (tip, tail) = if up { (2.5, 17.0) } else { (17.5, 3.0) };
+            let wing = if up { tip + 4.0 } else { tip - 4.0 };
+            pen.heavy(&[(15.0, tail), (15.0, wing)], k.solid, 1.1);
+            pen.poly(&[(12.2, wing), (15.0, tip), (17.8, wing)], k.solid, Color32::TRANSPARENT);
         }
         "outlineExpand" | "outlineCollapse" => {
-            pen.fcircle(10.0, 10.0, 6.5, c);
-            pen.line_c(&[(6.5, 10.0), (13.5, 10.0)], Color32::WHITE);
+            let (bg, fg) = pen.badge();
+            pen.disc(10.0, 10.0, 7.0, bg, pen.k.ink);
+            pen.heavy(&[(6.6, 10.0), (13.4, 10.0)], fg, 1.1);
             if name == "outlineExpand" {
-                pen.line_c(&[(10.0, 6.5), (10.0, 13.5)], Color32::WHITE);
+                pen.heavy(&[(10.0, 6.6), (10.0, 13.4)], fg, 1.1);
             }
         }
         "closeOutline" => {
-            pen.page(4.0, 2.0, 16.0, 18.0);
-            pen.line_c(&[(7.0, 8.0), (13.0, 14.0)], red);
-            pen.line_c(&[(13.0, 8.0), (7.0, 14.0)], red);
+            let k = pen.k;
+            pen.sheet(3.0, 2.0, 13.0, 15.0);
+            pen.disc(14.5, 14.5, 4.5, k.solid, Color32::TRANSPARENT);
+            pen.seg(&[(12.8, 12.8), (16.2, 16.2)], pen.n.tint);
+            pen.seg(&[(16.2, 12.8), (12.8, 16.2)], pen.n.tint);
         }
         "help" => {
             let (bg, fg) = pen.badge();
@@ -1737,62 +1761,72 @@ fn art(pen: &Pen, name: &str) -> bool {
         }
         // Developer › Controls: a field's frame with what it holds.
         "ccRichText" => {
-            pen.rect(2.5, 5.0, 17.5, 15.0, a);
-            pen.text(7.5, 10.0, 8.0, "A", c, true);
-            pen.text(13.0, 10.5, 7.0, "a", c, false);
+            let k = pen.k;
+            pen.rr(2.5, 5.0, 17.5, 15.0, 1.6, k.tint, k.solid);
+            pen.text(7.5, 10.0, 8.5, "A", k.ink, true);
+            pen.text(13.0, 10.5, 7.5, "a", k.ink, false);
         }
         "ccPlainText" => {
-            pen.rect(2.5, 5.0, 17.5, 15.0, a);
-            pen.text(8.0, 10.0, 8.0, "A", c, false);
-            pen.line(&[(12.0, 7.5), (12.0, 12.5)]);
+            let k = pen.k;
+            pen.rr(2.5, 5.0, 17.5, 15.0, 1.6, k.tint, k.solid);
+            pen.text(8.0, 10.0, 8.5, "A", k.ink, false);
+            pen.seg(&[(12.5, 7.5), (12.5, 12.5)], k.ink);
         }
         "ccPicture" => {
-            pen.rect(2.5, 4.0, 17.5, 16.0, a);
-            pen.line(&[(4.5, 14.0), (8.5, 9.5), (11.5, 12.5), (13.5, 10.5), (15.5, 14.0)]);
-            pen.fcircle(13.5, 7.0, 1.2, c);
+            let k = pen.k;
+            pen.rr(2.5, 4.0, 17.5, 16.0, 1.6, k.tint, k.solid);
+            pen.poly(&[(4.5, 14.5), (8.5, 9.0), (12.5, 14.5)], k.solid, Color32::TRANSPARENT);
+            pen.dot(13.8, 7.5, 1.4, pen.fam(Family::Amber).solid);
         }
         "ccGallery" => {
-            pen.rect(2.5, 3.0, 17.5, 17.0, a);
-            pen.frect(5.0, 5.5, 9.0, 9.5, c);
-            pen.frect(11.0, 5.5, 15.0, 9.5, c);
-            pen.lines(5.0, 15.0, &[12.5, 15.0]);
+            let k = pen.k;
+            pen.rr(2.5, 3.0, 17.5, 17.0, 1.6, k.tint, k.solid);
+            pen.rr(5.0, 5.5, 9.0, 9.5, 0.6, k.solid, Color32::TRANSPARENT);
+            pen.rr(11.0, 5.5, 15.0, 9.5, 0.6, k.solid, Color32::TRANSPARENT);
+            pen.rows(5.0, 15.0, &[12.5, 15.0], k.ink);
         }
         "ccCheckBox" => {
-            pen.rect(4.0, 4.0, 16.0, 16.0, c);
-            pen.line_c(&[(6.5, 10.0), (9.0, 13.0), (14.0, 6.5)], a);
+            let k = pen.k;
+            pen.rr(3.5, 3.5, 16.5, 16.5, 2.2, k.tint, k.solid);
+            pen.heavy(&[(6.5, 10.0), (9.0, 13.0), (14.0, 6.5)], k.solid, 1.3);
         }
         "ccComboBox" => {
-            pen.rect(2.5, 6.0, 17.5, 14.0, c);
-            pen.line(&[(13.0, 6.0), (13.0, 14.0)]);
-            pen.lines(4.5, 10.5, &[10.0]);
-            pen.arrow_down(15.25, 10.0, a);
+            let k = pen.k;
+            pen.rr(2.5, 6.0, 17.5, 14.0, 1.6, pen.n.tint, k.ink);
+            pen.rr(12.5, 6.0, 17.5, 14.0, 1.6, k.solid, k.ink);
+            pen.rows(4.5, 10.5, &[10.0], k.ink);
+            pen.poly(&[(13.5, 9.0), (16.5, 9.0), (15.0, 11.2)], pen.n.tint, Color32::TRANSPARENT);
         }
         "ccDropDown" => {
-            pen.rect(2.5, 3.0, 17.5, 9.0, c);
-            pen.line(&[(13.0, 3.0), (13.0, 9.0)]);
-            pen.arrow_down(15.25, 6.0, a);
-            pen.rect(2.5, 9.0, 13.0, 17.0, c);
-            pen.lines(4.5, 11.0, &[11.5, 14.5]);
+            let k = pen.k;
+            pen.rr(2.5, 9.0, 13.0, 17.5, 1.2, k.tint, k.ink);
+            pen.rows(4.5, 11.0, &[12.0, 14.8], k.ink);
+            pen.rr(2.5, 2.5, 17.5, 9.0, 1.4, pen.n.tint, k.ink);
+            pen.rr(12.5, 2.5, 17.5, 9.0, 1.4, k.solid, k.ink);
+            pen.poly(&[(13.5, 5.0), (16.5, 5.0), (15.0, 7.2)], pen.n.tint, Color32::TRANSPARENT);
         }
         "ccDate" => {
-            pen.rect(3.0, 4.5, 17.0, 17.0, c);
-            pen.frect(3.0, 4.5, 17.0, 8.0, a);
-            pen.line(&[(6.5, 3.0), (6.5, 6.0)]);
-            pen.line(&[(13.5, 3.0), (13.5, 6.0)]);
-            for (x, y) in [(6.5, 11.0), (10.0, 11.0), (13.5, 11.0), (6.5, 14.5), (10.0, 14.5)] {
-                pen.fcircle(x, y, 0.9, c);
+            let k = pen.k;
+            pen.rr(3.0, 4.5, 17.0, 17.5, 1.8, pen.n.tint, k.ink);
+            pen.rr(3.0, 4.5, 17.0, 8.3, 1.8, k.solid, k.ink);
+            pen.seg(&[(6.5, 3.0), (6.5, 6.0)], k.ink);
+            pen.seg(&[(13.5, 3.0), (13.5, 6.0)], k.ink);
+            for (x, y) in [(6.5, 11.3), (10.0, 11.3), (13.5, 11.3), (6.5, 14.6), (10.0, 14.6)] {
+                pen.dot(x, y, 0.95, k.ink);
             }
         }
         "ccRepeat" => {
-            pen.rect(2.5, 3.0, 17.5, 17.0, a);
-            pen.rect(5.0, 5.5, 15.0, 9.5, c);
-            pen.rect(5.0, 11.0, 15.0, 15.0, c);
-            pen.line_c(&[(10.0, 15.0), (10.0, 18.5)], a);
+            let k = pen.k;
+            pen.rr(2.5, 2.5, 17.5, 17.0, 1.8, Color32::TRANSPARENT, k.solid);
+            pen.rr(5.0, 5.0, 15.0, 9.5, 1.0, k.tint, k.ink);
+            pen.rr(5.0, 11.0, 15.0, 15.0, 1.0, k.tint, k.ink);
+            pen.heavy(&[(10.0, 15.0), (10.0, 18.8)], k.solid, 1.1);
         }
         "designMode" => {
-            pen.line(&[(4.0, 16.0), (16.0, 16.0), (4.0, 4.0), (4.0, 16.0)]);
-            pen.line_c(&[(4.0, 12.0), (8.0, 16.0)], a);
-            pen.line(&[(7.0, 13.0), (7.0, 12.0)]);
+            let k = pen.k;
+            pen.poly(&[(4.0, 4.0), (16.0, 16.0), (4.0, 16.0)], k.tint, Color32::TRANSPARENT);
+            pen.seg(&[(4.0, 16.0), (16.0, 16.0), (4.0, 4.0), (4.0, 16.0)], k.ink);
+            pen.poly(&[(4.0, 11.0), (9.0, 16.0), (4.0, 16.0)], k.solid, Color32::TRANSPARENT);
         }
         _ => return false,
     }
