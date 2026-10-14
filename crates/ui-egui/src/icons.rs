@@ -123,6 +123,19 @@ impl<'a> Pen<'a> {
     fn badge(&self) -> (Color32, Color32) {
         if self.mono { (self.k.tint, self.k.ink) } else { (self.k.solid, self.n.tint) }
     }
+    /// A page with a folded corner: paper fill, neutral outline.
+    #[allow(dead_code)] // first used by the Insert tab batch
+    fn sheet(&self, x0: f32, y0: f32, x1: f32, y1: f32) {
+        let n = self.n;
+        self.poly(&[(x0, y0), (x1 - 4.0, y0), (x1, y0 + 4.0), (x1, y1), (x0, y1)], n.tint, n.ink);
+        self.poly(&[(x1 - 4.0, y0), (x1, y0 + 4.0), (x1 - 4.0, y0 + 4.0)], self.k.tint, n.ink);
+    }
+    /// Horizontal text lines with round caps.
+    fn rows(&self, x0: f32, x1: f32, ys: &[f32], c: Color32) {
+        for y in ys {
+            self.seg(&[(x0, *y), (x1, *y)], c);
+        }
+    }
     /// A filled dot.
     fn dot(&self, x: f32, y: f32, r: f32, c: Color32) {
         self.p.circle_filled(self.pt(x, y), r * self.s(), c);
@@ -259,207 +272,241 @@ fn art(pen: &Pen, name: &str) -> bool {
     match name {
         // Clipboard
         "paste" => {
-            pen.rect(4.0, 3.5, 14.0, 17.0, c);
-            pen.frect(7.0, 2.0, 11.0, 5.0, a);
-            pen.frect(9.0, 8.0, 17.5, 18.5, pen.a.linear_multiply(0.18));
-            pen.rect(9.0, 8.0, 17.5, 18.5, a);
-            pen.lines(10.8, 15.8, &[11.0, 13.5, 16.0]);
+            let (k, n) = (pen.k, pen.n);
+            pen.rr(3.5, 3.5, 14.0, 17.5, 1.6, k.tint, k.ink);
+            pen.rr(6.5, 1.8, 11.0, 5.2, 1.0, k.solid, k.ink);
+            pen.rr(8.5, 8.0, 17.5, 18.5, 1.4, n.tint, k.ink);
+            pen.rows(10.6, 15.4, &[11.2, 13.6, 16.0], k.solid);
         }
         "cut" => {
-            pen.circle(6.0, 15.0, 2.5, c);
-            pen.circle(14.0, 15.0, 2.5, c);
-            pen.line(&[(7.5, 13.0), (14.0, 3.0)]);
-            pen.line(&[(12.5, 13.0), (6.0, 3.0)]);
+            let (k, n) = (pen.k, pen.n);
+            pen.seg(&[(7.6, 12.6), (14.0, 2.8)], n.ink);
+            pen.seg(&[(12.4, 12.6), (6.0, 2.8)], n.ink);
+            pen.disc(6.0, 15.2, 2.9, k.solid, Color32::TRANSPARENT);
+            pen.disc(14.0, 15.2, 2.9, k.solid, Color32::TRANSPARENT);
+            pen.disc(6.0, 15.2, 1.1, n.tint, Color32::TRANSPARENT);
+            pen.disc(14.0, 15.2, 1.1, n.tint, Color32::TRANSPARENT);
         }
         "copy" => {
-            pen.rect(3.5, 3.0, 12.5, 14.0, c);
-            pen.frect(7.5, 6.5, 16.5, 17.5, Color32::TRANSPARENT);
-            pen.rect(7.5, 6.5, 16.5, 17.5, a);
+            let (k, n) = (pen.k, pen.n);
+            pen.rr(3.0, 2.5, 12.5, 13.5, 1.5, k.tint, k.ink);
+            pen.rr(7.5, 6.5, 17.0, 17.5, 1.5, n.tint, k.ink);
+            pen.rows(9.8, 14.6, &[10.2, 12.6, 15.0], k.solid);
         }
         "painter" => {
-            pen.frect(4.0, 3.0, 16.0, 8.0, yellow);
-            pen.rect(4.0, 3.0, 16.0, 8.0, c);
-            pen.line(&[(16.0, 5.5), (17.5, 5.5), (17.5, 10.0), (10.0, 10.0), (10.0, 12.0)]);
-            pen.frect(8.8, 12.0, 11.2, 18.0, c);
+            let (k, n) = (pen.k, pen.n);
+            pen.rr(3.5, 2.5, 15.5, 8.0, 1.5, k.solid, k.ink);
+            pen.seg(&[(15.5, 5.2), (17.5, 5.2), (17.5, 10.0), (10.0, 10.0), (10.0, 12.0)], n.ink);
+            pen.rr(8.6, 12.0, 11.4, 18.5, 1.0, k.tint, k.ink);
         }
         // Font
-        "bold" => pen.text(10.0, 10.5, 15.0, "B", c, true),
-        "italic" => pen.text(10.0, 10.5, 15.0, "I", c, false),
+        "bold" => pen.text(10.0, 10.5, 15.5, "B", pen.k.ink, true),
+        "italic" => pen.text(10.0, 10.5, 15.5, "I", pen.k.ink, false),
         "underline" => {
-            pen.text(10.0, 9.0, 14.0, "U", c, false);
-            pen.line(&[(5.0, 17.0), (15.0, 17.0)]);
+            pen.text(10.0, 8.8, 13.5, "U", pen.k.ink, false);
+            pen.heavy(&[(5.0, 17.2), (15.0, 17.2)], pen.k.solid, 1.2);
         }
         "strike" => {
-            pen.text(10.0, 10.0, 12.0, "ab", c, false);
-            pen.line_c(&[(3.0, 10.5), (17.0, 10.5)], c);
+            pen.text(10.0, 10.0, 12.0, "ab", pen.k.ink, false);
+            pen.heavy(&[(3.0, 10.6), (17.0, 10.6)], pen.k.solid, 1.1);
         }
         "charborder" => {
-            pen.rect(3.0, 3.0, 17.0, 17.0, a);
-            pen.text(10.0, 6.0, 9.0, "A", c, false);
+            pen.rr(3.0, 3.0, 17.0, 17.0, 2.0, pen.k.tint, pen.k.solid);
+            pen.text(10.0, 10.0, 10.0, "A", pen.k.ink, true);
         }
         "enclose" => {
-            pen.circle(10.0, 10.5, 7.5, a);
-            pen.text(10.0, 10.5, 9.0, "A", c, false);
+            pen.disc(10.0, 10.2, 7.5, pen.k.tint, pen.k.solid);
+            pen.text(10.0, 10.2, 9.5, "A", pen.k.ink, true);
         }
         "subscript" => {
-            pen.text(8.0, 9.0, 13.0, "x", c, false);
-            pen.text(15.0, 14.5, 8.0, "2", a, true);
+            pen.text(8.0, 9.0, 13.0, "x", pen.k.ink, false);
+            pen.text(15.0, 14.5, 8.5, "2", pen.k.solid, true);
         }
         "superscript" => {
-            pen.text(8.0, 11.0, 13.0, "x", c, false);
-            pen.text(15.0, 5.0, 8.0, "2", a, true);
+            pen.text(8.0, 11.0, 13.0, "x", pen.k.ink, false);
+            pen.text(15.0, 5.0, 8.5, "2", pen.k.solid, true);
         }
         "grow" => {
-            pen.text(8.0, 11.0, 15.0, "A", c, false);
-            pen.fill(&[(14.5, 6.0), (18.5, 6.0), (16.5, 3.0)], a);
+            pen.text(8.0, 11.0, 15.0, "A", pen.k.ink, false);
+            pen.poly(&[(14.0, 6.5), (19.0, 6.5), (16.5, 2.5)], pen.k.solid, Color32::TRANSPARENT);
         }
         "shrink" => {
-            pen.text(8.0, 12.0, 11.0, "A", c, false);
-            pen.fill(&[(14.5, 4.0), (18.5, 4.0), (16.5, 7.0)], a);
+            pen.text(8.0, 12.0, 11.0, "A", pen.k.ink, false);
+            pen.poly(&[(14.0, 3.5), (19.0, 3.5), (16.5, 7.5)], pen.k.solid, Color32::TRANSPARENT);
         }
-        "case" => pen.text(10.0, 10.5, 12.0, "Aa", c, false),
+        "case" => {
+            pen.text(7.0, 10.5, 13.0, "A", pen.k.ink, false);
+            pen.text(14.0, 11.5, 10.0, "a", pen.k.solid, true);
+        }
         "clear" => {
-            pen.text(8.0, 9.0, 13.0, "A", c, false);
-            pen.fill(&[(10.0, 15.0), (14.0, 11.0), (18.0, 15.0), (14.0, 19.0)], Color32::from_rgb(0xE8, 0x6F, 0xA0));
+            pen.text(8.0, 9.0, 13.0, "A", pen.k.ink, false);
+            let pink = if pen.mono { c } else { rgb(0xE8_6F_A0) };
+            pen.poly(&[(10.0, 15.0), (14.0, 11.0), (18.0, 15.0), (14.0, 19.0)], pink, Color32::TRANSPARENT);
+            pen.poly(&[(10.0, 15.0), (12.0, 13.0), (16.0, 17.0), (14.0, 19.0)], pen.n.tint, Color32::TRANSPARENT);
         }
         // Small letters over a large one: text with a reading above it.
         "phonetic" => {
-            pen.text(10.0, 5.0, 7.5, "abc", a, false);
-            pen.text(10.0, 13.5, 12.5, "A", c, false);
+            pen.text(10.0, 4.8, 7.5, "abc", pen.k.solid, true);
+            pen.text(10.0, 13.5, 12.5, "A", pen.k.ink, false);
         }
         "highlight" => {
-            pen.fill(&[(5.0, 12.0), (11.0, 4.0), (14.0, 7.0), (8.0, 15.0)], c);
-            pen.line(&[(5.0, 12.0), (3.5, 15.0), (8.0, 15.0)]);
-            pen.frect(2.0, 16.5, 18.0, 19.0, yellow);
+            let (k, n) = (pen.k, pen.n);
+            pen.poly(&[(5.0, 12.0), (11.0, 4.0), (14.0, 7.0), (8.0, 15.0)], n.tint, n.ink);
+            pen.poly(&[(11.0, 4.0), (12.5, 2.5), (15.5, 5.5), (14.0, 7.0)], n.ink, Color32::TRANSPARENT);
+            pen.poly(&[(5.0, 12.0), (8.0, 15.0), (3.5, 15.5)], k.solid, Color32::TRANSPARENT);
+            pen.rr(2.0, 16.5, 18.0, 19.2, 0.8, k.solid, Color32::TRANSPARENT);
         }
         "fontcolor" => {
-            pen.text(10.0, 9.0, 14.0, "A", c, false);
-            pen.frect(2.0, 16.5, 18.0, 19.0, red);
+            pen.text(10.0, 8.8, 13.5, "A", pen.n.ink, false);
+            pen.rr(2.0, 16.5, 18.0, 19.2, 0.8, pen.k.solid, Color32::TRANSPARENT);
         }
         "effects" => {
-            pen.text(10.0, 10.0, 15.0, "A", a, true);
-            pen.text(10.5, 10.5, 15.0, "A", Color32::from_rgba_unmultiplied(0, 0, 0, 40), true);
+            pen.text(10.6, 10.6, 15.0, "A", pen.k.tint, true);
+            pen.text(10.0, 10.0, 15.0, "A", pen.k.solid, true);
         }
-        "fontdialog" => pen.line(&[(13.0, 13.0), (17.0, 17.0), (17.0, 13.0)]),
+        "fontdialog" => pen.seg(&[(13.0, 13.0), (17.0, 17.0), (17.0, 13.0)], pen.n.ink),
         // Paragraph
         "bullets" => {
-            for (i, y) in [5.0, 10.0, 15.0].iter().enumerate() {
-                pen.fcircle(4.0, *y, 1.4, if i == 0 { a } else { c });
-                pen.line(&[(7.5, *y), (17.0, *y)]);
+            for y in [5.0, 10.0, 15.0] {
+                pen.dot(4.0, y, 1.7, pen.k.solid);
+                pen.seg(&[(8.0, y), (17.0, y)], pen.k.ink);
             }
         }
         "numbering" => {
             for (i, y) in [5.0, 10.0, 15.0].iter().enumerate() {
-                pen.text(4.0, *y, 6.0, &(i + 1).to_string(), if i == 0 { a } else { c }, true);
-                pen.line(&[(7.5, *y), (17.0, *y)]);
+                pen.text(4.0, *y, 6.5, &(i + 1).to_string(), pen.k.solid, true);
+                pen.seg(&[(8.0, *y), (17.0, *y)], pen.k.ink);
             }
         }
         "multilevel" => {
-            pen.text(3.5, 4.5, 5.5, "1", a, true);
-            pen.line(&[(6.5, 4.5), (17.0, 4.5)]);
-            pen.text(6.5, 10.0, 5.5, "a", c, true);
-            pen.line(&[(9.5, 10.0), (17.0, 10.0)]);
-            pen.text(9.5, 15.5, 5.5, "i", c, true);
-            pen.line(&[(12.0, 15.5), (17.0, 15.5)]);
+            let k = pen.k;
+            pen.text(3.5, 4.5, 6.0, "1", k.solid, true);
+            pen.seg(&[(6.8, 4.5), (17.0, 4.5)], k.ink);
+            pen.text(6.5, 10.0, 6.0, "a", k.solid, true);
+            pen.seg(&[(9.8, 10.0), (17.0, 10.0)], k.ink);
+            pen.text(9.5, 15.5, 6.0, "i", k.solid, true);
+            pen.seg(&[(12.3, 15.5), (17.0, 15.5)], k.ink);
         }
         "outdent" | "indent" => {
-            pen.lines(9.0, 17.0, &[7.0, 10.0, 13.0]);
-            pen.lines(3.0, 17.0, &[3.5, 16.5]);
+            let k = pen.k;
+            pen.rows(9.5, 17.0, &[7.0, 10.0, 13.0], k.ink);
+            pen.rows(3.0, 17.0, &[3.5, 16.5], k.ink);
             if name == "indent" {
-                pen.fill(&[(3.0, 7.0), (3.0, 13.0), (6.5, 10.0)], a);
+                pen.poly(&[(3.0, 6.8), (3.0, 13.2), (7.0, 10.0)], k.solid, Color32::TRANSPARENT);
             } else {
-                pen.fill(&[(6.5, 7.0), (6.5, 13.0), (3.0, 10.0)], a);
+                pen.poly(&[(7.0, 6.8), (7.0, 13.2), (3.0, 10.0)], k.solid, Color32::TRANSPARENT);
             }
         }
         "sort" => {
-            pen.text(6.0, 5.5, 7.0, "A", c, true);
-            pen.text(6.0, 14.5, 7.0, "Z", c, true);
-            pen.line_c(&[(14.0, 3.0), (14.0, 17.0)], a);
-            pen.line_c(&[(11.5, 14.5), (14.0, 17.0), (16.5, 14.5)], a);
+            let k = pen.k;
+            pen.text(6.0, 5.5, 7.5, "A", k.ink, true);
+            pen.text(6.0, 14.5, 7.5, "Z", k.ink, true);
+            pen.heavy(&[(14.0, 3.0), (14.0, 15.0)], k.solid, 1.1);
+            pen.poly(&[(11.0, 13.5), (17.0, 13.5), (14.0, 18.0)], k.solid, Color32::TRANSPARENT);
         }
-        "pilcrow" => pen.text(10.0, 10.5, 15.0, "¶", c, false),
+        "pilcrow" => pen.text(10.0, 10.5, 15.0, "¶", pen.k.solid, false),
         "alignLeft" => {
-            pen.lines(3.0, 17.0, &[4.0, 10.0, 16.0]);
-            ().then_lines(pen, 3.0, 12.0, &[7.0, 13.0])
+            pen.rows(3.0, 17.0, &[4.0, 10.0, 16.0], pen.k.ink);
+            pen.rows(3.0, 12.0, &[7.0, 13.0], pen.k.solid);
         }
         "alignCenter" => {
-            pen.lines(3.0, 17.0, &[4.0, 10.0, 16.0]);
-            ().then_lines(pen, 6.0, 14.0, &[7.0, 13.0])
+            pen.rows(3.0, 17.0, &[4.0, 10.0, 16.0], pen.k.ink);
+            pen.rows(6.0, 14.0, &[7.0, 13.0], pen.k.solid);
         }
         "alignRight" => {
-            pen.lines(3.0, 17.0, &[4.0, 10.0, 16.0]);
-            ().then_lines(pen, 8.0, 17.0, &[7.0, 13.0])
+            pen.rows(3.0, 17.0, &[4.0, 10.0, 16.0], pen.k.ink);
+            pen.rows(8.0, 17.0, &[7.0, 13.0], pen.k.solid);
         }
-        "justify" => pen.lines(3.0, 17.0, &[4.0, 7.0, 10.0, 13.0, 16.0]),
+        "justify" => {
+            pen.rows(3.0, 17.0, &[4.0, 10.0, 16.0], pen.k.ink);
+            pen.rows(3.0, 17.0, &[7.0, 13.0], pen.k.solid);
+        }
         // Text direction: lines set from the start edge, an arrow in the reading direction.
         "textLtr" => {
-            pen.lines(3.0, 14.0, &[4.0, 8.0]);
-            pen.lines(3.0, 10.0, &[12.0]);
-            pen.line_c(&[(3.0, 16.5), (16.5, 16.5)], a);
-            pen.line_c(&[(13.5, 14.0), (16.5, 16.5), (13.5, 19.0)], a);
+            let k = pen.k;
+            pen.rows(3.0, 14.0, &[4.0, 8.0], k.ink);
+            pen.rows(3.0, 10.0, &[12.0], k.ink);
+            pen.heavy(&[(3.0, 16.5), (14.0, 16.5)], k.solid, 1.1);
+            pen.poly(&[(13.0, 13.8), (17.5, 16.5), (13.0, 19.2)], k.solid, Color32::TRANSPARENT);
         }
         "textRtl" => {
-            pen.lines(6.0, 17.0, &[4.0, 8.0]);
-            pen.lines(10.0, 17.0, &[12.0]);
-            pen.line_c(&[(17.0, 16.5), (3.5, 16.5)], a);
-            pen.line_c(&[(6.5, 14.0), (3.5, 16.5), (6.5, 19.0)], a);
+            let k = pen.k;
+            pen.rows(6.0, 17.0, &[4.0, 8.0], k.ink);
+            pen.rows(10.0, 17.0, &[12.0], k.ink);
+            pen.heavy(&[(17.0, 16.5), (6.0, 16.5)], k.solid, 1.1);
+            pen.poly(&[(7.0, 13.8), (2.5, 16.5), (7.0, 19.2)], k.solid, Color32::TRANSPARENT);
         }
         "lineSpacing" => {
-            pen.lines(9.0, 17.0, &[5.0, 10.0, 15.0]);
-            pen.line_c(&[(4.5, 3.0), (4.5, 17.0)], a);
-            pen.line_c(&[(2.5, 5.0), (4.5, 3.0), (6.5, 5.0)], a);
-            pen.line_c(&[(2.5, 15.0), (4.5, 17.0), (6.5, 15.0)], a);
+            let k = pen.k;
+            pen.rows(9.5, 17.0, &[5.0, 10.0, 15.0], k.ink);
+            pen.heavy(&[(4.5, 5.0), (4.5, 15.0)], k.solid, 1.1);
+            pen.poly(&[(2.0, 5.5), (7.0, 5.5), (4.5, 2.0)], k.solid, Color32::TRANSPARENT);
+            pen.poly(&[(2.0, 14.5), (7.0, 14.5), (4.5, 18.0)], k.solid, Color32::TRANSPARENT);
         }
         "shading" => {
-            pen.fill(&[(4.0, 9.0), (10.0, 3.0), (16.0, 9.0), (10.0, 15.0)], Color32::TRANSPARENT);
-            pen.closed(&[(4.0, 9.0), (10.0, 3.0), (16.0, 9.0), (10.0, 15.0)], c);
-            pen.fcircle(16.5, 13.5, 1.6, a);
-            pen.frect(2.0, 16.5, 18.0, 19.0, yellow);
+            let (k, n) = (pen.k, pen.n);
+            pen.poly(&[(4.0, 9.0), (10.0, 3.0), (16.0, 9.0), (10.0, 15.0)], n.tint, n.ink);
+            pen.poly(&[(4.0, 9.0), (16.0, 9.0), (10.0, 15.0)], k.tint, n.ink);
+            pen.dot(16.8, 13.2, 1.7, k.solid);
+            pen.rr(2.0, 16.5, 18.0, 19.2, 0.8, k.solid, Color32::TRANSPARENT);
         }
         "borders" => {
+            let k = pen.k;
             for y in [3.0, 10.0, 17.0] {
                 for x in [3.0, 6.5, 10.0, 13.5, 17.0] {
-                    pen.fcircle(x, y, 0.6, c);
+                    pen.dot(x, y, 0.7, k.ink);
                 }
             }
             for x in [3.0, 10.0, 17.0] {
                 for y in [6.5, 13.5] {
-                    pen.fcircle(x, y, 0.6, c);
+                    pen.dot(x, y, 0.7, k.ink);
                 }
             }
-            pen.line_c(&[(3.0, 17.0), (17.0, 17.0)], a);
+            pen.heavy(&[(3.0, 17.0), (17.0, 17.0)], k.solid, 1.2);
         }
         // Editing
         "find" => {
-            pen.circle(8.0, 8.0, 5.0, c);
-            pen.line_c(&[(11.5, 11.5), (17.0, 17.0)], a);
+            let k = pen.k;
+            pen.heavy(&[(12.0, 12.0), (16.8, 16.8)], k.solid, 2.0);
+            pen.disc(8.3, 8.3, 5.2, k.tint, k.ink);
         }
         "replace" => {
-            pen.text(6.0, 6.0, 8.0, "ab", c, false);
-            pen.text(13.0, 15.0, 8.0, "ac", a, false);
-            pen.line(&[(13.0, 3.5), (16.0, 3.5), (16.0, 8.5)]);
-            pen.line(&[(14.5, 7.0), (16.0, 8.5), (17.5, 7.0)]);
+            let k = pen.k;
+            pen.text(6.0, 6.0, 8.5, "ab", k.ink, true);
+            pen.text(13.0, 15.0, 8.5, "ac", k.solid, true);
+            pen.seg(&[(12.8, 3.5), (16.0, 3.5), (16.0, 8.0)], k.ink);
+            pen.poly(&[(14.0, 7.5), (18.0, 7.5), (16.0, 10.0)], k.ink, Color32::TRANSPARENT);
         }
         "select" => {
-            pen.fill(&[(5.0, 3.0), (5.0, 16.0), (8.0, 13.0), (10.5, 18.0), (12.5, 17.0), (10.0, 12.0), (14.0, 12.0)], c);
+            let k = pen.k;
+            pen.poly(&[(5.0, 3.0), (5.0, 16.0), (8.0, 13.0), (14.0, 12.0)], k.solid, Color32::TRANSPARENT);
+            pen.poly(&[(8.0, 13.0), (10.0, 12.0), (12.5, 17.0), (10.5, 18.0)], k.solid, Color32::TRANSPARENT);
+            pen.closed(&[(5.0, 3.0), (5.0, 16.0), (8.0, 13.0), (10.5, 18.0), (12.5, 17.0), (10.0, 12.0), (14.0, 12.0)], k.ink);
         }
         "dictate" => {
-            pen.rect(7.5, 2.5, 12.5, 12.0, c);
-            pen.line(&[(5.0, 9.5), (5.0, 11.0), (10.0, 15.0), (15.0, 11.0), (15.0, 9.5)]);
-            pen.line(&[(10.0, 15.0), (10.0, 18.0)]);
+            let k = pen.k;
+            pen.rr(7.3, 2.5, 12.7, 12.0, 2.7, k.solid, k.ink);
+            pen.seg(&[(5.0, 9.5), (5.0, 10.5), (10.0, 15.0), (15.0, 10.5), (15.0, 9.5)], k.ink);
+            pen.seg(&[(10.0, 15.0), (10.0, 18.0)], k.ink);
+            pen.seg(&[(7.5, 18.0), (12.5, 18.0)], k.ink);
         }
         "editor" | "spelling" => {
-            pen.text(8.0, 7.0, 9.0, "abc", c, true);
-            pen.line_c(&[(5.0, 13.0), (8.5, 16.5), (16.0, 9.0)], green);
+            let tick = if pen.mono { c } else { tones(Family::Green, false).solid };
+            pen.text(8.0, 6.8, 9.0, "abc", pen.k.ink, true);
+            pen.heavy(&[(5.0, 13.0), (8.5, 16.5), (16.0, 9.0)], tick, 1.3);
         }
         "styles" => {
-            pen.text(10.0, 10.0, 14.0, "A", a, false);
-            pen.line(&[(13.0, 15.0), (17.0, 11.0)]);
+            let k = pen.k;
+            pen.text(9.0, 9.5, 14.0, "A", k.solid, false);
+            pen.seg(&[(13.0, 16.0), (17.5, 11.5)], k.ink);
+            pen.dot(13.0, 16.0, 1.2, k.ink);
         }
         "stylesPane" => {
-            pen.rect(3.0, 3.0, 17.0, 17.0, c);
-            pen.line(&[(11.0, 3.0), (11.0, 17.0)]);
-            pen.text(7.0, 10.0, 8.0, "A", a, false);
+            let (k, n) = (pen.k, pen.n);
+            pen.rr(3.0, 3.0, 17.0, 17.0, 1.8, n.tint, n.ink);
+            pen.rr(11.0, 3.0, 17.0, 17.0, 1.8, k.tint, n.ink);
+            pen.text(7.0, 10.0, 8.5, "A", k.solid, true);
+            pen.rows(12.8, 15.2, &[6.5, 9.5, 12.5], k.solid);
         }
         // Insert
         "coverPage" => {
@@ -1628,16 +1675,6 @@ fn art(pen: &Pen, name: &str) -> bool {
     true
 }
 
-trait ThenLines {
-    fn then_lines(self, pen: &Pen, x0: f32, x1: f32, ys: &[f32]);
-}
-
-impl ThenLines for () {
-    fn then_lines(self, pen: &Pen, x0: f32, x1: f32, ys: &[f32]) {
-        pen.lines(x0, x1, ys);
-    }
-}
-
 /// Draw an Insert › Icons library icon into `r` in `c`, from the same path data the inserted
 /// picture is rendered from (`wordcraft_render::icon_lib`).
 pub fn library(p: &Painter, r: Rect, icon: &wordcraft_render::icon_lib::Icon, c: Color32) {
@@ -1726,7 +1763,56 @@ mod tests {
     #[test]
     fn monochrome_when_accent_equals_ink() {
         let grey = Color32::from_rgb(0xA6, 0xA6, 0xA6);
-        for name in ["paste", "save", "table", "picture", "comment", "bold"] {
+        for name in [
+            "paste",
+            "save",
+            "table",
+            "picture",
+            "comment",
+            "bold",
+            "cut",
+            "copy",
+            "painter",
+            "underline",
+            "strike",
+            "charborder",
+            "enclose",
+            "case",
+            "clear",
+            "highlight",
+            "fontcolor",
+            "effects",
+            "bullets",
+            "numbering",
+            "multilevel",
+            "indent",
+            "sort",
+            "alignLeft",
+            "justify",
+            "textLtr",
+            "lineSpacing",
+            "shading",
+            "borders",
+            "find",
+            "replace",
+            "select",
+            "dictate",
+            "spelling",
+            "styles",
+            "stylesPane",
+            "info",
+            "help",
+            "homeFolder",
+            "docPrefs",
+            "open",
+            "folder",
+            "print",
+            "pin",
+            "user",
+            "share",
+            "search",
+            "undo",
+        ] {
             let cs = colours(name, grey, grey);
             assert!(!cs.is_empty(), "{name}");
             assert!(cs.iter().all(|c| near(*c, grey)), "{name}: {cs:?}");
