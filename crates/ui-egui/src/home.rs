@@ -110,6 +110,7 @@ enum RowAction {
 /// File › Home.
 pub(crate) fn page(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
+    drop_hint(ui, &t);
     let search_id = egui::Id::new("home_search");
     let mut query = ui.ctx().data(|d| d.get_temp::<String>(search_id)).unwrap_or_default();
     // Header, templates and list share one column, as wide as the five template cards.
@@ -225,6 +226,30 @@ pub(crate) fn page(app: &mut WordApp, ui: &mut Ui) {
             RowAction::Remove => remove_recent(&mut app.ui, &path),
         }
     }
+}
+
+/// While files are dragged over the window: "Drop to open" over the visible page (dropping is
+/// handled for the whole window in `WordApp::logic`).
+fn drop_hint(ui: &Ui, t: &Tokens) {
+    if ui.ctx().input(|i| i.raw.hovered_files.is_empty()) {
+        return;
+    }
+    let r = ui.clip_rect().shrink(12.0);
+    egui::Area::new(egui::Id::new("home_drop_hint")).order(egui::Order::Foreground).fixed_pos(r.min).interactable(false).show(ui.ctx(), |ui| {
+        let (r, _) = ui.allocate_exact_size(r.size(), Sense::hover());
+        let p = ui.painter();
+        p.rect_filled(r, 12.0, t.ribbon.gamma_multiply(0.92));
+        p.rect_filled(r, 12.0, t.accent.gamma_multiply(0.06));
+        let s = Stroke::new(2.0, t.accent);
+        for (a, b) in
+            [(r.left_top(), r.right_top()), (r.right_top(), r.right_bottom()), (r.right_bottom(), r.left_bottom()), (r.left_bottom(), r.left_top())]
+        {
+            p.extend(egui::Shape::dashed_line(&[a, b], s, 8.0, 6.0));
+        }
+        icons::paint(p, Rect::from_center_size(r.center() - vec2(0.0, 34.0), vec2(40.0, 40.0)), "open", t.accent, t.accent);
+        let label = Rect::from_center_size(r.center() + vec2(0.0, 12.0), vec2(r.width(), 30.0));
+        ui.put(label, egui::Label::new(egui::RichText::new(tl!("Drop to open")).font(semibold(18.0)).color(t.accent)).selectable(false));
+    });
 }
 
 /// The file's modification time as unix seconds; `Err` when it can't be read (missing file).
@@ -628,5 +653,15 @@ mod tests {
         h.run_steps(3);
         assert!(h.query_by_label("Show in Finder").is_none() && h.query_by_label("Show in folder").is_none());
         assert!(h.query_by_label("Copy path").is_some());
+    }
+    #[test]
+    fn dragging_a_file_over_home_shows_the_drop_hint() {
+        use egui_kittest::kittest::Queryable;
+        let mut h = harness(app_with_recent(&[]));
+        h.run_steps(3);
+        assert!(h.query_by_label("Drop to open").is_none());
+        h.input_mut().hovered_files.push(egui::HoveredFile { path: Some("/x/a.docx".into()), ..Default::default() });
+        h.run_steps(2);
+        assert!(h.query_by_label("Drop to open").is_some());
     }
 }

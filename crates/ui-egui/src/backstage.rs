@@ -6,17 +6,18 @@ use serde_json::json;
 use crate::theme::{APP_COLOR, Tokens, medium, regular, semibold};
 use crate::{WordApp, icons};
 
-const PAGES: [(&str, &str); 10] = [
-    ("home", "Home"),
-    ("new", "New"),
-    ("open", "Open"),
-    ("info", "Info"),
-    ("save", "Save"),
-    ("saveAs", "Save As"),
-    ("print", "Print"),
-    ("export", "Export"),
-    ("close", "Close"),
-    ("options", "Options"),
+/// Page id, label and icon.
+const PAGES: [(&str, &str, &str); 10] = [
+    ("home", "Home", "homeFolder"),
+    ("new", "New", "plus"),
+    ("open", "Open", "open"),
+    ("info", "Info", "info"),
+    ("save", "Save", "save"),
+    ("saveAs", "Save As", "save"),
+    ("print", "Print", "print"),
+    ("export", "Export", "share"),
+    ("close", "Close", "close"),
+    ("options", "Options", "docPrefs"),
 ];
 
 pub fn show(app: &mut WordApp, ui: &mut Ui) {
@@ -63,19 +64,23 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 app.canvas.want_focus = true;
             }
             ui.add_space(if mac { 12.0 } else { 6.0 });
-            for (id, label) in PAGES {
+            for (id, label, icon) in PAGES {
                 // No document open (#1129): Info, Save, Save As, Print and Export are greyed out.
                 let on = has_document || works_without_document(id);
                 let (r, resp) = ui.add_enabled_ui(on, |ui| ui.allocate_exact_size(vec2(200.0, 38.0), Sense::click())).inner;
                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, on, tl!(label)));
                 let active = app.ui.backstage_page == id;
+                let hover = ui.ctx().animate_bool_with_time(resp.id.with("hover"), on && resp.hovered(), 0.12);
                 if active {
                     ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(46));
-                } else if on && resp.hovered() {
-                    ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(26));
+                    ui.painter().rect_filled(Rect::from_min_size(r.min, vec2(3.0, r.height())), 0.0, egui::Color32::WHITE);
+                } else if hover > 0.0 {
+                    ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha((26.0 * hover) as u8));
                 }
+                let ink = if on { egui::Color32::WHITE } else { egui::Color32::from_white_alpha(110) };
+                icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 32.0, r.center().y), vec2(18.0, 18.0)), icon, ink, ink);
                 ui.painter().text(
-                    pos2(r.min.x + 22.0, r.center().y),
+                    pos2(r.min.x + 54.0, r.center().y),
                     Align2::LEFT_CENTER,
                     tl!(label),
                     if active { semibold(14.0) } else { medium(14.0) },
