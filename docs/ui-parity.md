@@ -1,6 +1,6 @@
 # UI parity with Microsoft Word
 
-> **Last reviewed:** 2026-10-14 · **Last updated:** 2026-10-14 · **Change:** trivial (colourful icon set; previously trivial: interactive File › Home: search, Recent/Pinned, row actions; previously trivial: web Save Changes prompt waits for the save picker, #1315; previously trivial: Ink to Shape recognises arrows; previously trivial: no document behind the Start screen, #1129; previously trivial: equation pictures share a few textures, #1002; previously trivial: selection bar in the left margin, #856; previously trivial: table column and row markers on the rulers, #700; previously trivial: table borders and the resize handle drag on the page, #217; previously major: first version; ribbon, dialogs, shortcuts and on-canvas interaction measured from `crates/ui-egui` and the command registry) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-14 · **Last updated:** 2026-10-14 · **Change:** trivial (AI agents button and dialog; previously trivial: colourful icon set; previously trivial: interactive File › Home: search, Recent/Pinned, row actions; previously trivial: web Save Changes prompt waits for the save picker, #1315; previously trivial: Ink to Shape recognises arrows; previously trivial: no document behind the Start screen, #1129; previously trivial: equation pictures share a few textures, #1002; previously trivial: selection bar in the left margin, #856; previously trivial: table column and row markers on the rulers, #700; previously trivial: table borders and the resize handle drag on the page, #217; previously major: first version; ribbon, dialogs, shortcuts and on-canvas interaction measured from `crates/ui-egui` and the command registry) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 How WordCraft looks and feels next to Word: ribbon, dialogs, panes, keyboard, mouse and touch.
 Typing behaviour has its own checklist ([`typing-parity.md`](typing-parity.md)). All assets are our
@@ -49,6 +49,7 @@ own (`AGENTS.md`: no Microsoft iconography, ever).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-14 | trivial | AI agents: title-bar button and dialog (Allow AI agents switch, one-click connect for Claude, Claude Code, Codex and Antigravity); agent edits arrive as tracked changes under the agent's name |
 | 2026-10-14 | trivial | Icon set redrawn in colour (306 code-drawn icons): two-tone fills, rounded shapes, one colour family per function (clipboard orange, font red, paragraph/view blue, insert/tables green, review purple, layout/references teal, mailings amber), dark-theme tones, one-colour mode for disabled icons; Backstage sidebar icons on every item |
 | 2026-10-14 | trivial | File › Home redesign: greeting in local time (was UTC), search over templates and recent/pinned documents, five animated template cards, Recent/Pinned tabs with badges and modified times, row menu (Pin, Show in Finder, Copy path, Remove from list), empty states, drop hint; sidebar icons |
 | 2026-10-13 | trivial | The caret is black or white by contrast with the paper, page colour, dark page, shading or highlight under it (#299) |

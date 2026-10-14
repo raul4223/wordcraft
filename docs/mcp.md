@@ -176,3 +176,26 @@ the distance from the text). Missing fields are `none`, 0, no colour and 0, so a
 | `kinsoku`, `wordWrap`, `overflowPunct`, `autoSpaceDE`, `autoSpaceDN`, `snapToGrid` | bool | East Asian typography; unset = on |
 | `topLinePunct` | bool | East Asian typography; unset = off |
 | `numChange`, `fmtChange` | | Track Changes bookkeeping |
+
+## AI agents (Claude, Codex, Antigravity)
+
+The **AI agents** button in the title bar connects the AI apps on this Mac to the open document,
+using their own accounts (Claude, ChatGPT through Codex, Google through Antigravity):
+
+1. Turn on **Allow AI agents**. The app then listens on `127.0.0.1:7979` (loopback only, with its
+   own key file `control-key.local-7979`); with the switch off every request is refused.
+2. Click **Connect** beside an app. WordCraft adds a `wordcraft` server to its config and keeps a
+   copy of the old file as `<config>.wordcraft-backup`:
+   - Claude: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - Claude Code: `~/.claude.json`
+   - Codex: `~/.codex/config.toml` (`[mcp_servers.wordcraft]`)
+   - Antigravity: `~/.gemini/antigravity/mcp_config.json`
+   The server it adds is the bundled CLI:
+   `WordCraft.app/Contents/MacOS/wordcraft-cli mcp --connect 127.0.0.1:7979 --agent Claude`.
+3. Restart that app and ask it, for example, "In WordCraft, proofread the open document."
+
+Every edit an agent makes is a tracked change under its name ("Claude", "Codex", "Antigravity"):
+the app turns Track Changes on and sets the author for each agent request, then restores yours.
+Clicks and keys an agent sends through the `click`/`key` tools run later as ordinary input, under
+your own settings. `--agent` bridges start even when WordCraft is closed and report "open
+WordCraft and turn on AI agents" until it is.

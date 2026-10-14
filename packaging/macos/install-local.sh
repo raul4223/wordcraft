@@ -40,18 +40,22 @@ cleanup() {
 trap cleanup EXIT
 
 echo "==> building WordCraft $VERSION (release) in $CARGO_TARGET_DIR"
-(cd "$ROOT" && cargo build --release --locked -p wordcraft)
+(cd "$ROOT" && cargo build --release --locked -p wordcraft -p wordcraft-cli)
 
 STAGE="$CARGO_TARGET_DIR/WordCraft.app"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/Contents/MacOS" "$STAGE/Contents/Resources"
 cp "$CARGO_TARGET_DIR/release/wordcraft" "$STAGE/Contents/MacOS/WordCraft"
+# The MCP bridge AI apps run (the AI agents dialog writes its path into their configs).
+cp "$CARGO_TARGET_DIR/release/wordcraft-cli" "$STAGE/Contents/MacOS/wordcraft-cli"
 cp "$ROOT/assets/app-icon/wordcraft.icns" "$STAGE/Contents/Resources/WordCraft.icns"
 sed -e "s/@VERSION@/$VERSION/g" -e "s/@SHORT_VERSION@/${VERSION%%-*}/g" \
   -e "s/@BUILD_SHA@/${WORDCRAFT_BUILD_SHA:-unknown}/g" \
   "$HERE/Info.plist.in" >"$STAGE/Contents/Info.plist"
 plutil -lint "$STAGE/Contents/Info.plist"
 printf 'APPL????' >"$STAGE/Contents/PkgInfo"
+# Nested code first, then the bundle.
+codesign --force --sign - --timestamp=none --options runtime "$STAGE/Contents/MacOS/wordcraft-cli"
 codesign --force --sign - --timestamp=none --options runtime \
   --entitlements "$HERE/entitlements.plist" "$STAGE"
 
