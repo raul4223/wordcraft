@@ -22,6 +22,7 @@ macro_rules! tl {
 
 pub mod a11y;
 pub mod a11y_pane;
+pub mod agents;
 pub mod async_saves;
 pub mod autoscroll;
 pub mod backstage;
@@ -112,6 +113,12 @@ pub struct Services {
     /// Desktop: show a file in the system file manager (File › Home › Show in Finder). `None`
     /// hides the action (web, tests).
     pub reveal: Option<Box<dyn Fn(&str)>>,
+    /// Desktop: start the AI agents control channel (port `wordcraft_agents::AGENTS_PORT`); called
+    /// once, when "Allow AI agents" is first on in a session. `None` from the hook: it couldn't.
+    pub start_agents: Option<Box<dyn Fn() -> Option<std::sync::mpsc::Receiver<ControlRequest>>>>,
+    /// Desktop: the bundled `wordcraft-cli`, which AI apps run to reach WordCraft. `None` hides
+    /// the AI agents dialog's Connect buttons (web, tests).
+    pub agent_cli: Option<String>,
     /// Web: open a file picker; the file arrives later through `inbox`.
     pub open_async: Option<Box<dyn Fn(&str)>>,
     /// Web: files (name, bytes) delivered asynchronously (picker, drag and drop).
@@ -235,6 +242,8 @@ pub struct UiState {
     pub print: print_page::PrintSettings,
     pub ribbon_collapsed: bool,
     pub recent: Vec<String>,
+    /// "Allow AI agents": the AI agents channel serves requests (spec 2026-10-14-ai-agents).
+    pub agents_enabled: bool,
     /// Documents pinned on File › Home, newest pin first.
     pub pinned: Vec<String>,
     /// Symbols inserted from the Symbol dialog, most recent first (#321).
@@ -341,6 +350,7 @@ impl Default for UiState {
             print: print_page::PrintSettings::default(),
             ribbon_collapsed: false,
             recent: Vec::new(),
+            agents_enabled: false,
             pinned: Vec::new(),
             recent_symbols: Vec::new(),
             recent_colors: Vec::new(),
@@ -448,6 +458,8 @@ pub struct WordApp {
     /// macOS: the title bar's height and where its content starts, around the traffic lights.
     pub mac_titlebar: chrome::MacTitleBar,
     control_rx: Option<std::sync::mpsc::Receiver<ControlRequest>>,
+    /// The AI agents channel ([`agents`]), once started.
+    agent_rx: Option<std::sync::mpsc::Receiver<ControlRequest>>,
     shot_token: u64,
     queued_shots: Vec<(u64, f64, u32)>,
     pending_shots: Vec<(u64, Option<String>, std::sync::mpsc::Sender<Value>, f64)>,
@@ -577,6 +589,7 @@ impl WordApp {
             integrated_titlebar: false,
             mac_titlebar: chrome::MacTitleBar::default(),
             control_rx: None,
+            agent_rx: None,
             shot_token: 0,
             queued_shots: Vec::new(),
             pending_shots: Vec::new(),
@@ -1419,6 +1432,22 @@ impl WordApp {
                 }
                 json!({"alignmentGuides": self.ui.alignment_guides})
             }
+            // The AI agents button: `value` true or false turns "Allow AI agents" on or off (on
+            // starts the agents channel the first time); no value reads it. `open` shows the dialog.
+            "ui.aiAgents" => {
+                match p.get("value") {
+                    None => {}
+                    Some(Value::Bool(on)) => {
+                        self.ui.agents_enabled = *on;
+                        self.sync_agents();
+                    }
+                    Some(_) => return Some(Err("`value` must be true or false".into())),
+                }
+                if p.get("open").and_then(Value::as_bool) == Some(true) {
+                    self.dialog = dialogs::Dialog::open("aiAgents", self);
+                }
+                json!({"aiAgents": self.ui.agents_enabled})
+            }
             "ui.startScreen" => {
                 // File › Options › General › Start-up (#766): `value` true or false turns showing
                 // File › Home at start-up on or off; no value reads it.
@@ -1663,6 +1692,7 @@ impl WordApp {
         }
         self.poll_printing(ctx);
         self.drain_control(ctx);
+        self.drain_agents(ctx);
         zotero::poll(self, ctx);
         read_aloud::poll(self, ctx);
         self.clear_stale_change_picture();
@@ -1961,20 +1991,25 @@ impl WordApp {
     fn drain_control(&mut self, ctx: &egui::Context) {
         let Some(rx) = self.control_rx.take() else { return };
         while let Ok(req) = rx.try_recv() {
-            let reply = req.reply.clone();
-            match control::handle(self, ctx, &req) {
-                control::Outcome::Done(v) => {
-                    let _ = reply.send(v);
-                }
-                control::Outcome::Screenshot { path } => {
-                    self.shot_token += 1;
-                    let token = self.shot_token;
-                    self.queued_shots.push((token, now_ms() + 120.0, 0));
-                    self.pending_shots.push((token, path, reply, now_ms() + 8000.0));
-                }
-            }
+            let outcome = control::handle(self, ctx, &req);
+            self.deliver(req.reply, outcome);
         }
         self.control_rx = Some(rx);
+    }
+
+    /// Send a control request's answer, or queue the screenshot it asked for.
+    fn deliver(&mut self, reply: std::sync::mpsc::Sender<Value>, outcome: control::Outcome) {
+        match outcome {
+            control::Outcome::Done(v) => {
+                let _ = reply.send(v);
+            }
+            control::Outcome::Screenshot { path } => {
+                self.shot_token += 1;
+                let token = self.shot_token;
+                self.queued_shots.push((token, now_ms() + 120.0, 0));
+                self.pending_shots.push((token, path, reply, now_ms() + 8000.0));
+            }
+        }
     }
 
     fn issue_screenshots(&mut self, ctx: &egui::Context) {
@@ -2189,6 +2224,7 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "ui.discord"
             | "ui.caretAnimation"
             | "ui.startScreen"
+            | "ui.aiAgents"
     ) || id.starts_with("help.")
 }
 

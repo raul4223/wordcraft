@@ -5189,6 +5189,7 @@ dependencies = [
  "winit",
  "winresource",
  "wl-clipboard-rs",
+ "wordcraft-agents",
  "wordcraft-control-key",
  "wordcraft-doc",
  "wordcraft-engine",

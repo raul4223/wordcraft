@@ -74,6 +74,28 @@ pub fn start(port: u16, ctx: egui::Context, settings: Option<&Path>) -> Option<(
     Some((serve_on(listener, ctx, key, FIRST_REQUEST), key_file))
 }
 
+/// The AI agents channel's key file, removed on exit with [`remove_agent_key`].
+static AGENT_KEY: std::sync::Mutex<Option<KeyFile>> = std::sync::Mutex::new(None);
+
+/// Start the AI agents channel on `wordcraft_agents::AGENTS_PORT` (the AI agents dialog's
+/// switch); its key file is kept for [`remove_agent_key`].
+pub fn start_agents(ctx: egui::Context) -> Option<Receiver<ControlRequest>> {
+    let (rx, file) = start(wordcraft_agents::AGENTS_PORT, ctx, wordcraft_control_key::settings_dir().as_deref())?;
+    if let Ok(mut held) = AGENT_KEY.lock() {
+        *held = file;
+    }
+    Some(rx)
+}
+
+/// Remove the AI agents channel's key file, if it was started.
+pub fn remove_agent_key() {
+    if let Ok(mut held) = AGENT_KEY.lock()
+        && let Some(f) = held.take()
+    {
+        f.remove();
+    }
+}
+
 /// A new key: 32 random bytes from the operating system, as hex.
 fn random_key() -> Result<String, String> {
     let mut b = [0u8; 32];
@@ -237,7 +259,9 @@ fn serve(stream: TcpStream, tx: Sender<ControlRequest>, ctx: egui::Context, key:
             }
             continue;
         }
-        let (req, rrx) = ControlRequest::new(method, params);
+        let (mut req, rrx) = ControlRequest::new(method, params);
+        // An AI agent's bridge names its agent (`wordcraft-cli mcp --agent`).
+        req.agent = msg.get("agent").and_then(Value::as_str).map(str::to_string);
         if tx.send(req).is_err() {
             break;
         }
@@ -335,6 +359,17 @@ mod tests {
         // Every request needs it: one without the key is refused, also after good ones.
         assert_eq!(c.call(r#"{"id":8,"method":"document.inspect"}"#)["error"], "unauthorized");
         assert!(c.closed());
+    }
+
+    #[test]
+    fn an_agent_request_names_its_agent() {
+        let (port, rx) = boot();
+        let mut c = Conn::open(port);
+        c.send(&format!(r#"{{"id":3,"key":"{KEY}","agent":"Claude","method":"document.inspect"}}"#));
+        assert_eq!(answer(&rx).agent.as_deref(), Some("Claude"));
+        c.recv();
+        c.send(&format!(r#"{{"id":4,"key":"{KEY}","method":"document.inspect"}}"#));
+        assert_eq!(answer(&rx).agent, None, "plain control requests name no agent");
     }
 
     #[test]

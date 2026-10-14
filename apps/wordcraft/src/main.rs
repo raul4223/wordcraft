@@ -86,6 +86,7 @@ impl eframe::App for App {
         if let Some(key_file) = &self.2 {
             key_file.remove();
         }
+        control_server::remove_agent_key();
     }
 }
 
@@ -113,6 +114,7 @@ fn schedule_macos_terminate(app: &WordApp, key_file: Option<&control_server::Key
     if let Some(key_file) = key_file {
         key_file.remove();
     }
+    control_server::remove_agent_key();
     dispatch2::DispatchQueue::main().exec_async(|| {
         if let Some(mtm) = objc2::MainThreadMarker::new() {
             objc2_app_kit::NSApplication::sharedApplication(mtm).terminate(None);
@@ -218,10 +220,23 @@ fn services(file_dialog: file_dialogs::Hook, ctx: &egui::Context) -> Services {
         set_clipboard_html: Some(Box::new(clipboard::set_html)),
         clipboard_rtf: Some(Box::new(clipboard::rtf)),
         clipboard_formats: Some(Box::new(clipboard::formats)),
+        start_agents: Some({
+            let ctx = ctx.clone();
+            Box::new(move || control_server::start_agents(ctx.clone()))
+        }),
+        agent_cli: bundled_cli(),
         utc_offset: Some(Box::new(|| jiff::Zoned::now().offset().seconds())),
         reveal: Some(Box::new(reveal::reveal)),
         ..Default::default()
     }
+}
+
+/// `wordcraft-cli` next to this executable (inside WordCraft.app, or in cargo's target folder),
+/// which AI apps run to reach WordCraft.
+fn bundled_cli() -> Option<String> {
+    let exe = std::env::current_exe().ok()?;
+    let cli = exe.parent()?.join(if cfg!(windows) { "wordcraft-cli.exe" } else { "wordcraft-cli" });
+    cli.is_file().then(|| cli.display().to_string())
 }
 
 /// Window, Dock and taskbar icon.
@@ -325,6 +340,8 @@ fn main() -> eframe::Result {
             session.system_region = region;
             let mut app = WordApp::new(session, services(file_dialog, &cc.egui_ctx));
             load_prefs(&mut app);
+            // "Allow AI agents" left on last time: start their channel again.
+            app.sync_agents();
             load_user_dictionary(&mut app);
             // A region chosen in File › Options replaces the system's for the first blank
             // document too (#838).
