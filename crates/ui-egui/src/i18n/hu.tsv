@@ -2538,3 +2538,19 @@
 	Pin documents to keep them here.	Rögzítse a dokumentumokat, hogy itt maradjanak.
 	Nothing matches your search.	Nincs a keresésnek megfelelő találat.
 	Drop to open	Engedje el a megnyitáshoz
+	AI agents	MI-ügynökök
+	Allow AI agents	MI-ügynökök engedélyezése
+	AI apps on this Mac can read and edit the open document. Their edits arrive as tracked changes under their name.	A Mac MI-alkalmazásai olvashatják és szerkeszthetik a megnyitott dokumentumot. A változtatásaik követett módosításként, a nevükkel érkeznek.
+	Connected	Csatlakoztatva
+	Not connected	Nincs csatlakoztatva
+	Not installed	Nincs telepítve
+	Connect	Csatlakoztatás
+	Disconnect	Leválasztás
+	Restart {app} to load WordCraft.	Indítsa újra: {app}, hogy betöltse a WordCraftot.
+	Restart {app} to drop WordCraft.	Indítsa újra: {app}, hogy eltávolítsa a WordCraftot.
+	Then ask your AI app, for example: “In WordCraft, proofread the open document.”	Ezután kérje meg az MI-alkalmazását, például: „A WordCraftban nézd át a megnyitott dokumentumot.”
+	Let Claude, Codex or Antigravity work on this document	Hagyja, hogy Claude, Codex vagy Antigravity dolgozzon ezen a dokumentumon
+	Claude	Claude
+	Claude Code	Claude Code
+	Codex (ChatGPT)	Codex (ChatGPT)
+	Antigravity	Antigravity

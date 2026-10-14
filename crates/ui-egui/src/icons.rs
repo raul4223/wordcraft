@@ -186,7 +186,7 @@ pub fn family(name: &str) -> Family {
         "newComment" | "comment" | "prevComment" | "nextComment" | "showComments" | "resolve" | "trackChanges" | "markup" | "reviewingPane"
         | "prevChange" | "nextChange" | "compare" | "combine" | "protect" | "restrict" | "blockAuthors" | "spelling" | "editor" | "thesaurus"
         | "wordCount" | "accessibility" | "altText" | "translate" | "language" | "styles" | "stylesPane" | "themes" | "colors" | "fonts"
-        | "paraSpacing" | "effectsDesign" | "watermark" | "pageColor" | "pageBorders" => Purple,
+        | "paraSpacing" | "effectsDesign" | "watermark" | "pageColor" | "pageBorders" | "aiAgents" => Purple,
         "margins" | "orientation" | "size" | "columns" | "breaks" | "lineNumbers" | "hyphenation" | "position" | "wrapText" | "bringForward"
         | "sendBackward" | "selectionPane" | "align" | "group" | "rotate" | "indentLeft" | "indentRight" | "spaceBefore" | "spaceAfter" | "toc"
         | "addText" | "updateTable" | "update" | "footnote" | "endnote" | "nextFootnote" | "showNotes" | "researcher" | "docPrefs"
@@ -1821,6 +1821,20 @@ fn art(pen: &Pen, name: &str) -> bool {
             pen.rr(5.0, 5.0, 15.0, 9.5, 1.0, k.tint, k.ink);
             pen.rr(5.0, 11.0, 15.0, 15.0, 1.0, k.tint, k.ink);
             pen.heavy(&[(10.0, 15.0), (10.0, 18.8)], k.solid, 1.1);
+        }
+        // AI agents: a chat bubble with a four-point spark (original art).
+        "aiAgents" => {
+            let k = pen.k;
+            pen.rr(2.5, 4.5, 14.5, 14.0, 2.2, k.tint, k.ink);
+            pen.poly(&[(4.8, 13.5), (8.8, 13.5), (4.8, 17.5)], k.tint, Color32::TRANSPARENT);
+            pen.seg(&[(4.8, 14.0), (4.8, 17.5), (8.8, 14.0)], k.ink);
+            let (cx, cy, a, b) = (14.5, 5.0, 4.2, 1.1);
+            pen.poly(
+                &[(cx, cy - a), (cx + b, cy - b), (cx + a, cy), (cx + b, cy + b), (cx, cy + a), (cx - b, cy + b), (cx - a, cy), (cx - b, cy - b)],
+                k.solid,
+                Color32::TRANSPARENT,
+            );
+            pen.rows(5.5, 10.5, &[8.5, 11.0], k.ink);
         }
         "designMode" => {
             let k = pen.k;

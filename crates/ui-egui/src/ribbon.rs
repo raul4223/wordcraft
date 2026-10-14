@@ -264,6 +264,16 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                     if crate::widgets::icon_text_button(ui, "comment", tl!("Comments"), regular(12.0)).clicked() {
                         let _ = app.run("view.commentsPane", json!({}));
                     }
+                    ui.add_space(4.0);
+                    // AI agents (spec 2026-10-14-ai-agents): a green dot while they are allowed.
+                    let agents = crate::widgets::icon_text_button(ui, "aiAgents", tl!("AI agents"), regular(12.0));
+                    agents.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("AI agents")));
+                    if app.ui.agents_enabled {
+                        ui.painter().circle_filled(pos2(agents.rect.min.x + 18.0, agents.rect.min.y + 5.0), 3.0, t.green);
+                    }
+                    if agents.on_hover_text(tl!("Let Claude, Codex or Antigravity work on this document")).clicked() {
+                        let _ = app.run("ui.aiAgents", json!({"open": true}));
+                    }
                 });
             });
         });

@@ -2533,3 +2533,19 @@ preview	Title	Tytuł
 	Pin documents to keep them here.	Przypnij dokumenty, aby były tutaj.
 	Nothing matches your search.	Nic nie pasuje do wyszukiwania.
 	Drop to open	Upuść, aby otworzyć
+	AI agents	Agenci AI
+	Allow AI agents	Zezwalaj agentom AI
+	AI apps on this Mac can read and edit the open document. Their edits arrive as tracked changes under their name.	Aplikacje AI na tym Macu mogą czytać i edytować otwarty dokument. Ich zmiany są śledzone pod ich nazwą.
+	Connected	Połączono
+	Not connected	Nie połączono
+	Not installed	Nie zainstalowano
+	Connect	Połącz
+	Disconnect	Rozłącz
+	Restart {app} to load WordCraft.	Uruchom ponownie {app}, aby wczytać WordCraft.
+	Restart {app} to drop WordCraft.	Uruchom ponownie {app}, aby usunąć WordCraft.
+	Then ask your AI app, for example: “In WordCraft, proofread the open document.”	Potem poproś swoją aplikację AI, na przykład: „W WordCraft popraw otwarty dokument.”
+	Let Claude, Codex or Antigravity work on this document	Pozwól Claude, Codex lub Antigravity pracować nad tym dokumentem
+	Claude	Claude
+	Claude Code	Claude Code
+	Codex (ChatGPT)	Codex (ChatGPT)
+	Antigravity	Antigravity

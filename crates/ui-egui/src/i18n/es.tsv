@@ -2515,3 +2515,19 @@ preview	Title	Título
 	Pin documents to keep them here.	Ancle documentos para tenerlos aquí.
 	Nothing matches your search.	Nada coincide con su búsqueda.
 	Drop to open	Suelte para abrir
+	AI agents	Agentes de IA
+	Allow AI agents	Permitir agentes de IA
+	AI apps on this Mac can read and edit the open document. Their edits arrive as tracked changes under their name.	Las apps de IA de este Mac pueden leer y editar el documento abierto. Sus cambios llegan como cambios controlados con su nombre.
+	Connected	Conectado
+	Not connected	No conectado
+	Not installed	No instalado
+	Connect	Conectar
+	Disconnect	Desconectar
+	Restart {app} to load WordCraft.	Reinicie {app} para cargar WordCraft.
+	Restart {app} to drop WordCraft.	Reinicie {app} para quitar WordCraft.
+	Then ask your AI app, for example: “In WordCraft, proofread the open document.”	Luego pídale a su app de IA, por ejemplo: “En WordCraft, revisa el documento abierto.”
+	Let Claude, Codex or Antigravity work on this document	Deje que Claude, Codex o Antigravity trabajen en este documento
+	Claude	Claude
+	Claude Code	Claude Code
+	Codex (ChatGPT)	Codex (ChatGPT)
+	Antigravity	Antigravity

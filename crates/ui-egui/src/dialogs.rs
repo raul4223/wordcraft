@@ -466,6 +466,7 @@ pub enum Dialog {
     },
     /// Compare / Combine Documents and AutoCorrect Options ([`crate::dialogs_review`], #412).
     Review(Box<crate::dialogs_review::ReviewDialog>),
+    Agents(Box<crate::dialogs_agents::AgentsDialog>),
     /// Tools › Customize Keyboard (#368).
     CustomizeKeyboard {
         form: Box<crate::dialogs_keyboard::KeyboardForm>,
@@ -922,6 +923,7 @@ impl Dialog {
             Dialog::DefineList { .. } => "defineList",
             Dialog::TrackOptions { .. } => "trackChangesOptions",
             Dialog::Review(d) => d.name(),
+            Dialog::Agents(_) => "aiAgents",
             Dialog::CustomizeKeyboard { .. } => "customizeKeyboard",
             Dialog::CustomizeRibbon { .. } => "customizeRibbon",
             Dialog::Control { .. } => "controlProperties",
@@ -958,6 +960,9 @@ impl Dialog {
         }
         if let Some(d) = crate::dialogs_layout::open(name, app) {
             return Some(Dialog::Layout(Box::new(d)));
+        }
+        if name == "aiAgents" {
+            return Some(Dialog::Agents(Box::new(crate::dialogs_agents::open(app))));
         }
         if matches!(name, "compare" | "combine" | "autoCorrect" | "restrictEditing") {
             return crate::dialogs_review::open(name, app).map(|d| Dialog::Review(Box::new(d)));
@@ -1376,6 +1381,7 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
         Dialog::DefineList { .. } => "Define New Multilevel List",
         Dialog::TrackOptions { .. } => "Track Changes Options",
         Dialog::Review(d) => d.title(),
+        Dialog::Agents(_) => "AI agents",
         Dialog::CustomizeKeyboard { .. } => "Customize Keyboard",
         Dialog::CustomizeRibbon { .. } => "Customize Ribbon",
         Dialog::Control { .. } => "Content Control Properties",
@@ -2645,6 +2651,7 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
         Dialog::DefineList { form } => crate::dialogs_lists::define_list(app, ui, form),
         Dialog::TrackOptions { form } => crate::dialogs_lists::track_options(app, ui, form),
         Dialog::Review(d) => crate::dialogs_review::body(app, ui, d),
+        Dialog::Agents(d) => crate::dialogs_agents::body(app, ui, d),
         Dialog::CustomizeKeyboard { form } => crate::dialogs_keyboard::customize_keyboard(app, ui, form),
         Dialog::CustomizeRibbon { form } => crate::dialogs_ribbon::customize_ribbon(app, ui, form),
         Dialog::FieldCode { code, edit, message } => {

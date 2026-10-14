@@ -2166,3 +2166,19 @@
 	Pin documents to keep them here.	Закачите документе да остану овде.
 	Nothing matches your search.	Ништа не одговара претрази.
 	Drop to open	Пустите да отворите
+	AI agents	AI агенти
+	Allow AI agents	Дозволи AI агенте
+	AI apps on this Mac can read and edit the open document. Their edits arrive as tracked changes under their name.	AI апликације на овом Mac-у могу да читају и уређују отворени документ. Њихове измене стижу као праћене промене под њиховим именом.
+	Connected	Повезано
+	Not connected	Није повезано
+	Not installed	Није инсталирано
+	Connect	Повежи
+	Disconnect	Прекини везу
+	Restart {app} to load WordCraft.	Поново покрените {app} да учита WordCraft.
+	Restart {app} to drop WordCraft.	Поново покрените {app} да уклони WordCraft.
+	Then ask your AI app, for example: “In WordCraft, proofread the open document.”	Затим замолите своју AI апликацију, на пример: „У WordCraft-у прегледај отворени документ.“
+	Let Claude, Codex or Antigravity work on this document	Нека Claude, Codex или Antigravity раде на овом документу
+	Claude	Claude
+	Claude Code	Claude Code
+	Codex (ChatGPT)	Codex (ChatGPT)
+	Antigravity	Antigravity

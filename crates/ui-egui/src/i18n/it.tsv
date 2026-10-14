@@ -2524,3 +2524,19 @@ preview	Title	Esempio
 	Pin documents to keep them here.	Aggiungi i documenti per tenerli qui.
 	Nothing matches your search.	Nessun risultato per la ricerca.
 	Drop to open	Rilascia per aprire
+	AI agents	Agenti IA
+	Allow AI agents	Consenti agenti IA
+	AI apps on this Mac can read and edit the open document. Their edits arrive as tracked changes under their name.	Le app di IA su questo Mac possono leggere e modificare il documento aperto. Le loro modifiche arrivano come revisioni con il loro nome.
+	Connected	Connesso
+	Not connected	Non connesso
+	Not installed	Non installato
+	Connect	Connetti
+	Disconnect	Disconnetti
+	Restart {app} to load WordCraft.	Riavvia {app} per caricare WordCraft.
+	Restart {app} to drop WordCraft.	Riavvia {app} per rimuovere WordCraft.
+	Then ask your AI app, for example: “In WordCraft, proofread the open document.”	Poi chiedi alla tua app di IA, per esempio: “In WordCraft, correggi il documento aperto.”
+	Let Claude, Codex or Antigravity work on this document	Lascia che Claude, Codex o Antigravity lavorino su questo documento
+	Claude	Claude
+	Claude Code	Claude Code
+	Codex (ChatGPT)	Codex (ChatGPT)
+	Antigravity	Antigravity

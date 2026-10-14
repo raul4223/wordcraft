@@ -2164,3 +2164,19 @@
 	Pin documents to keep them here.	Закріплюйте документи, щоб вони були тут.
 	Nothing matches your search.	Нічого не знайдено.
 	Drop to open	Відпустіть, щоб відкрити
+	AI agents	ШІ-агенти
+	Allow AI agents	Дозволити ШІ-агентів
+	AI apps on this Mac can read and edit the open document. Their edits arrive as tracked changes under their name.	ШІ-застосунки на цьому Mac можуть читати й редагувати відкритий документ. Їхні зміни надходять як відстежувані під їхнім іменем.
+	Connected	Підключено
+	Not connected	Не підключено
+	Not installed	Не встановлено
+	Connect	Підключити
+	Disconnect	Відключити
+	Restart {app} to load WordCraft.	Перезапустіть {app}, щоб завантажити WordCraft.
+	Restart {app} to drop WordCraft.	Перезапустіть {app}, щоб прибрати WordCraft.
+	Then ask your AI app, for example: “In WordCraft, proofread the open document.”	Потім попросіть свій ШІ-застосунок, наприклад: «У WordCraft вичитай відкритий документ».
+	Let Claude, Codex or Antigravity work on this document	Нехай Claude, Codex або Antigravity попрацюють над цим документом
+	Claude	Claude
+	Claude Code	Claude Code
+	Codex (ChatGPT)	Codex (ChatGPT)
+	Antigravity	Antigravity

@@ -2558,3 +2558,19 @@
 	Pin documents to keep them here.	Ghim tài liệu để giữ chúng ở đây.
 	Nothing matches your search.	Không có kết quả phù hợp.
 	Drop to open	Thả để mở
+	AI agents	Tác tử AI
+	Allow AI agents	Cho phép tác tử AI
+	AI apps on this Mac can read and edit the open document. Their edits arrive as tracked changes under their name.	Ứng dụng AI trên máy Mac này có thể đọc và sửa tài liệu đang mở. Các sửa đổi của chúng đến dưới dạng thay đổi được theo dõi mang tên chúng.
+	Connected	Đã kết nối
+	Not connected	Chưa kết nối
+	Not installed	Chưa cài đặt
+	Connect	Kết nối
+	Disconnect	Ngắt kết nối
+	Restart {app} to load WordCraft.	Khởi động lại {app} để tải WordCraft.
+	Restart {app} to drop WordCraft.	Khởi động lại {app} để gỡ WordCraft.
+	Then ask your AI app, for example: “In WordCraft, proofread the open document.”	Sau đó hãy nhờ ứng dụng AI của bạn, ví dụ: “Trong WordCraft, hãy soát lỗi tài liệu đang mở.”
+	Let Claude, Codex or Antigravity work on this document	Để Claude, Codex hoặc Antigravity làm việc trên tài liệu này
+	Claude	Claude
+	Claude Code	Claude Code
+	Codex (ChatGPT)	Codex (ChatGPT)
+	Antigravity	Antigravity

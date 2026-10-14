@@ -5429,6 +5429,7 @@ dependencies = [
  "serde_json",
  "sys-locale",
  "toml",
+ "wordcraft-agents",
  "wordcraft-doc",
  "wordcraft-engine",
  "wordcraft-fonts",

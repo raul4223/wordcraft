@@ -2538,3 +2538,19 @@ preview	Title	Örnek
 	Pin documents to keep them here.	Burada tutmak için belgeleri sabitleyin.
 	Nothing matches your search.	Aramanızla eşleşen bir şey yok.
 	Drop to open	Açmak için bırakın
+	AI agents	Yapay zekâ ajanları
+	Allow AI agents	Yapay zekâ ajanlarına izin ver
+	AI apps on this Mac can read and edit the open document. Their edits arrive as tracked changes under their name.	Bu Mac'teki yapay zekâ uygulamaları açık belgeyi okuyup düzenleyebilir. Düzenlemeleri kendi adlarıyla izlenen değişiklik olarak gelir.
+	Connected	Bağlı
+	Not connected	Bağlı değil
+	Not installed	Yüklü değil
+	Connect	Bağla
+	Disconnect	Bağlantıyı kes
+	Restart {app} to load WordCraft.	WordCraft'ı yüklemek için {app} uygulamasını yeniden başlatın.
+	Restart {app} to drop WordCraft.	WordCraft'ı kaldırmak için {app} uygulamasını yeniden başlatın.
+	Then ask your AI app, for example: “In WordCraft, proofread the open document.”	Sonra yapay zekâ uygulamanızdan isteyin, örneğin: “WordCraft'ta açık belgeyi düzelt.”
+	Let Claude, Codex or Antigravity work on this document	Claude, Codex veya Antigravity bu belge üzerinde çalışsın
+	Claude	Claude
+	Claude Code	Claude Code
+	Codex (ChatGPT)	Codex (ChatGPT)
+	Antigravity	Antigravity

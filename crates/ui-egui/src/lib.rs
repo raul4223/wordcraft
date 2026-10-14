@@ -35,6 +35,7 @@ pub mod control;
 pub mod credits;
 pub mod desktop_theme;
 pub mod dialogs;
+pub mod dialogs_agents;
 pub mod dialogs_chart;
 pub mod dialogs_controls;
 pub mod dialogs_insert;

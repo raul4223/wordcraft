@@ -2186,3 +2186,19 @@
 	Pin documents to keep them here.	Kinnitage dokumendid, et need siia jääksid.
 	Nothing matches your search.	Otsingule ei vasta midagi.
 	Drop to open	Avamiseks lase lahti
+	AI agents	Tehisintellekti agendid
+	Allow AI agents	Luba tehisintellekti agendid
+	AI apps on this Mac can read and edit the open document. Their edits arrive as tracked changes under their name.	Selle Maci tehisintellekti rakendused saavad avatud dokumenti lugeda ja muuta. Nende muudatused tulevad jälitatavate muudatustena nende nimega.
+	Connected	Ühendatud
+	Not connected	Ühendamata
+	Not installed	Paigaldamata
+	Connect	Ühenda
+	Disconnect	Katkesta
+	Restart {app} to load WordCraft.	WordCrafti laadimiseks käivitage {app} uuesti.
+	Restart {app} to drop WordCraft.	WordCrafti eemaldamiseks käivitage {app} uuesti.
+	Then ask your AI app, for example: “In WordCraft, proofread the open document.”	Seejärel paluge oma tehisintellekti rakendusel, näiteks: „Loe WordCraftis avatud dokument üle.”
+	Let Claude, Codex or Antigravity work on this document	Laske Claude'il, Codexil või Antigravityl selle dokumendiga töötada
+	Claude	Claude
+	Claude Code	Claude Code
+	Codex (ChatGPT)	Codex (ChatGPT)
+	Antigravity	Antigravity

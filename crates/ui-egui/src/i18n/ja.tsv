@@ -2152,3 +2152,19 @@
 	Pin documents to keep them here.	ドキュメントをピン留めするとここに表示されます。
 	Nothing matches your search.	検索に一致するものはありません。
 	Drop to open	ドロップして開く
+	AI agents	AI エージェント
+	Allow AI agents	AI エージェントを許可
+	AI apps on this Mac can read and edit the open document. Their edits arrive as tracked changes under their name.	この Mac の AI アプリが開いている文書を読み取り、編集できます。編集は各アプリの名前で変更履歴として記録されます。
+	Connected	接続済み
+	Not connected	未接続
+	Not installed	未インストール
+	Connect	接続
+	Disconnect	切断
+	Restart {app} to load WordCraft.	WordCraft を読み込むには {app} を再起動してください。
+	Restart {app} to drop WordCraft.	WordCraft を外すには {app} を再起動してください。
+	Then ask your AI app, for example: “In WordCraft, proofread the open document.”	次に AI アプリに頼みます。例: 「WordCraft で、開いている文書を校正して。」
+	Let Claude, Codex or Antigravity work on this document	Claude、Codex、Antigravity にこの文書を任せる
+	Claude	Claude
+	Claude Code	Claude Code
+	Codex (ChatGPT)	Codex (ChatGPT)
+	Antigravity	Antigravity

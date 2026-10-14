@@ -2164,3 +2164,19 @@
 	Pin documents to keep them here.	固定文档以将其保留在此处。
 	Nothing matches your search.	没有符合搜索条件的结果。
 	Drop to open	松开以打开
+	AI agents	AI 代理
+	Allow AI agents	允许 AI 代理
+	AI apps on this Mac can read and edit the open document. Their edits arrive as tracked changes under their name.	此 Mac 上的 AI 应用可以读取和编辑打开的文档。它们的编辑以其名称作为修订记录。
+	Connected	已连接
+	Not connected	未连接
+	Not installed	未安装
+	Connect	连接
+	Disconnect	断开连接
+	Restart {app} to load WordCraft.	重新启动 {app} 以加载 WordCraft。
+	Restart {app} to drop WordCraft.	重新启动 {app} 以移除 WordCraft。
+	Then ask your AI app, for example: “In WordCraft, proofread the open document.”	然后让你的 AI 应用执行，例如：“在 WordCraft 中校对打开的文档。”
+	Let Claude, Codex or Antigravity work on this document	让 Claude、Codex 或 Antigravity 处理此文档
+	Claude	Claude
+	Claude Code	Claude Code
+	Codex (ChatGPT)	Codex (ChatGPT)
+	Antigravity	Antigravity
