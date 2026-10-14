@@ -10,9 +10,13 @@ struct Pen<'a> {
     c: Color32,
     a: Color32,
     w: f32,
+    /// The icon's family tones and the neutral ones (both `c` in monochrome mode).
+    k: Tones,
+    n: Tones,
+    mono: bool,
 }
 
-impl Pen<'_> {
+impl<'a> Pen<'a> {
     fn s(&self) -> f32 {
         self.r.width().min(self.r.height()) / 20.0
     }
@@ -66,19 +70,192 @@ impl Pen<'_> {
         self.closed(&[(x0, y0), (x1 - 4.0, y0), (x1, y0 + 4.0), (x1, y1), (x0, y1)], self.c);
         self.line(&[(x1 - 4.0, y0), (x1 - 4.0, y0 + 4.0), (x1, y0 + 4.0)]);
     }
+    /// Rounded rectangle; a `TRANSPARENT` fill or stroke is left out.
+    #[allow(clippy::too_many_arguments)]
+    fn rr(&self, x0: f32, y0: f32, x1: f32, y1: f32, radius: f32, fill: Color32, stroke: Color32) {
+        let rect = Rect::from_min_max(self.pt(x0, y0), self.pt(x1, y1));
+        let cr = egui::CornerRadius::same((radius * self.s()).clamp(0.0, 255.0) as u8);
+        if fill.a() > 0 {
+            self.p.rect_filled(rect, cr, fill);
+        }
+        if stroke.a() > 0 {
+            self.p.rect_stroke(rect, cr, self.stroke(stroke), egui::StrokeKind::Middle);
+        }
+    }
+    /// A convex polygon, filled and/or outlined (`TRANSPARENT` leaves a part out).
+    fn poly(&self, pts: &[(f32, f32)], fill: Color32, stroke: Color32) {
+        let v: Vec<Pos2> = pts.iter().map(|&(x, y)| self.pt(x, y)).collect();
+        let st = if stroke.a() > 0 { self.stroke(stroke) } else { Stroke::NONE };
+        self.p.add(Shape::convex_polygon(v, fill, st));
+    }
+    /// A polyline with round caps and joins.
+    fn seg(&self, pts: &[(f32, f32)], c: Color32) {
+        let v: Vec<Pos2> = pts.iter().map(|&(x, y)| self.pt(x, y)).collect();
+        let half = self.w * self.s() / 2.0;
+        for q in &v {
+            self.p.circle_filled(*q, half, c);
+        }
+        self.p.add(Shape::line(v, self.stroke(c)));
+    }
+    /// The same pen drawing into another box (an icon inside an icon).
+    fn at(&self, r: Rect) -> Pen<'a> {
+        Pen { p: self.p, r, c: self.c, a: self.a, w: self.w, k: self.k, n: self.n, mono: self.mono }
+    }
+    /// A polyline `k` times as heavy as the pen, with round caps.
+    fn heavy(&self, pts: &[(f32, f32)], c: Color32, k: f32) {
+        let v: Vec<Pos2> = pts.iter().map(|&(x, y)| self.pt(x, y)).collect();
+        let w = self.w * k * self.s();
+        for q in &v {
+            self.p.circle_filled(*q, w / 2.0, c);
+        }
+        self.p.add(Shape::line(v, Stroke::new(w, c)));
+    }
+    /// A filled and outlined circle (`TRANSPARENT` leaves a part out).
+    fn disc(&self, x: f32, y: f32, r: f32, fill: Color32, stroke: Color32) {
+        if fill.a() > 0 {
+            self.p.circle_filled(self.pt(x, y), r * self.s(), fill);
+        }
+        if stroke.a() > 0 {
+            self.p.circle_stroke(self.pt(x, y), r * self.s(), self.stroke(stroke));
+        }
+    }
+    /// Badge colours: a solid disc with a light glyph, or (one colour) a tinted disc with an ink glyph.
+    fn badge(&self) -> (Color32, Color32) {
+        if self.mono { (self.k.tint, self.k.ink) } else { (self.k.solid, self.n.tint) }
+    }
+    /// A filled dot.
+    fn dot(&self, x: f32, y: f32, r: f32, c: Color32) {
+        self.p.circle_filled(self.pt(x, y), r * self.s(), c);
+    }
     fn arrow_down(&self, x: f32, y: f32, c: Color32) {
         self.fill(&[(x - 2.5, y - 1.2), (x + 2.5, y - 1.2), (x, y + 1.5)], c);
     }
 }
 
-/// Paint icon `name` into `r`. `c` is the line colour; the accent comes from the theme.
+/// Colour families of the icon set (spec: colour by function).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Family {
+    Neutral,
+    Orange,
+    Red,
+    Blue,
+    Green,
+    Purple,
+    Teal,
+    Amber,
+}
+
+/// Linework, light fill and strong fill of a family in one theme.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Tones {
+    pub ink: Color32,
+    pub tint: Color32,
+    pub solid: Color32,
+}
+
+const fn rgb(v: u32) -> Color32 {
+    Color32::from_rgb((v >> 16) as u8, (v >> 8) as u8, v as u8)
+}
+
+pub fn tones(f: Family, dark: bool) -> Tones {
+    let (ink, tint, solid) = match (f, dark) {
+        (Family::Neutral, false) => (0x424242, 0xFFFFFF, 0x6B6B6B),
+        (Family::Neutral, true) => (0xDDDDDD, 0x3A3A3A, 0xB5B5B5),
+        (Family::Orange, false) => (0x7A4A12, 0xFBE3C2, 0xE8891C),
+        (Family::Orange, true) => (0xF6C48A, 0x5A3A14, 0xF29A35),
+        (Family::Red, false) => (0x7A1F1F, 0xFBD5D5, 0xD93636),
+        (Family::Red, true) => (0xF5A8A8, 0x5C2222, 0xF05A5A),
+        (Family::Blue, false) => (0x1F3F73, 0xD6E6FB, 0x2F7BE0),
+        (Family::Blue, true) => (0xB9D3F7, 0x1D3A5E, 0x5A9BF0),
+        (Family::Green, false) => (0x1E6B3A, 0xD7F1DF, 0x2EA35A),
+        (Family::Green, true) => (0x9FDDB4, 0x1D4A2C, 0x45C273),
+        (Family::Purple, false) => (0x4B2F86, 0xE7DDFB, 0x7C4FD9),
+        (Family::Purple, true) => (0xCDB8F5, 0x3A2766, 0x9B76EE),
+        (Family::Teal, false) => (0x0F5C55, 0xD2F0EC, 0x1C9C8F),
+        (Family::Teal, true) => (0x9ADED6, 0x16443F, 0x3CC2B3),
+        (Family::Amber, false) => (0x6E5200, 0xFDEFC3, 0xF2B705),
+        (Family::Amber, true) => (0xF5DA8A, 0x4D3D0E, 0xF5C842),
+    };
+    Tones { ink: rgb(ink), tint: rgb(tint), solid: rgb(solid) }
+}
+
+/// Icons whose accent part shows the user's chosen colour (the Draw tab's pen buttons pass the
+/// pen's colour). Font colour and highlight buttons paint the chosen colour over the icon instead.
+const DATA_COLOUR: [&str; 2] = ["pen", "pencil"];
+
+pub fn family(name: &str) -> Family {
+    use Family::*;
+    match name {
+        "paste" | "cut" | "copy" | "painter" | "pen" | "pencil" | "eraser" | "thickness" | "lasso" | "inkToShape" | "inkToMath" | "canvas"
+        | "replay" | "addPen" | "shapes" | "shapeEffects" | "addShape" | "wordArt" | "textFill" | "textOutline" | "transform" | "draw"
+        | "drawTable" | "borderPainter" | "hideInk" => Orange,
+        "bold" | "italic" | "underline" | "strike" | "charborder" | "enclose" | "subscript" | "superscript" | "grow" | "shrink" | "case"
+        | "clear" | "phonetic" | "fontcolor" | "effects" | "fontdialog" | "reject" | "deleteComment" | "deleteTable" | "checkErrors"
+        | "closeOutline" => Red,
+        "highlight" | "envelope" | "labels" | "mailMerge" | "recipients" | "editRecipients" | "mergeField" | "addressBlock" | "greetingLine"
+        | "rules" | "matchFields" | "highlightFields" | "preview" | "first" | "previous" | "next" | "last" | "finish" | "folder" | "homeFolder"
+        | "open" => Amber,
+        "coverPage" | "blankPage" | "pageBreak" | "table" | "picture" | "onlinePicture" | "icons" | "models3d" | "smartArt" | "chart"
+        | "screenshot" | "video" | "link" | "bookmark" | "crossRef" | "header" | "footer" | "pageNumber" | "textBox" | "quickParts" | "dropCap"
+        | "signature" | "dateTime" | "object" | "equation" | "symbol" | "accept" | "insertAbove" | "insertBelow" | "insertLeft" | "insertRight"
+        | "merge" | "splitCells" | "splitTable" | "autofit" | "distributeRows" | "distributeCols" | "rowHeight" | "colWidth" | "cellAlign"
+        | "textDirection" | "cellMargins" | "repeatHeader" | "toText" | "formula" | "selectTable" | "promote" | "demote" | "textPane"
+        | "smartArtColors" | "resetGraphic" | "changeChartType" | "chartData" | "chartTitle" | "legend" | "dataLabels" | "addins" | "setDefault"
+        | "ccRichText" | "ccPlainText" | "ccPicture" | "ccGallery" | "ccCheckBox" | "ccComboBox" | "ccDropDown" | "ccDate" | "ccRepeat"
+        | "designMode" | "plusCircle" => Green,
+        "newComment" | "comment" | "prevComment" | "nextComment" | "showComments" | "resolve" | "trackChanges" | "markup" | "reviewingPane"
+        | "prevChange" | "nextChange" | "compare" | "combine" | "protect" | "restrict" | "blockAuthors" | "spelling" | "editor" | "thesaurus"
+        | "wordCount" | "accessibility" | "altText" | "translate" | "language" | "styles" | "stylesPane" | "themes" | "colors" | "fonts"
+        | "paraSpacing" | "effectsDesign" | "watermark" | "pageColor" | "pageBorders" => Purple,
+        "margins" | "orientation" | "size" | "columns" | "breaks" | "lineNumbers" | "hyphenation" | "position" | "wrapText" | "bringForward"
+        | "sendBackward" | "selectionPane" | "align" | "group" | "rotate" | "indentLeft" | "indentRight" | "spaceBefore" | "spaceAfter" | "toc"
+        | "addText" | "updateTable" | "update" | "footnote" | "endnote" | "nextFootnote" | "showNotes" | "researcher" | "docPrefs"
+        | "unlinkCitations" | "addNote" | "citation" | "sources" | "bibliography" | "caption" | "tableOfFigures" | "markEntry" | "index"
+        | "markCitation" | "tableOfAuthorities" | "pastCitation" | "insertCitation" => Teal,
+        "dropdown" | "more" | "launcher" | "plus" | "minus" | "check" | "close" | "chevronLeft" | "chevronRight" | "chevronUp" | "chevronDown"
+        | "chevronDoubleRight" | "help" | "discord" => Neutral,
+        _ => Blue,
+    }
+}
+
+/// Paint icon `name` into `r`. `c` is the ink (and tells the theme: light ink means a dark theme).
+/// `accent == c` or a transparent accent asks for a one-colour icon in `c` (disabled buttons,
+/// icons on coloured bars); otherwise the icon's family palette colours it, and `accent` is only
+/// used by icons that show a chosen colour (font colour, highlighter, pens…).
 pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
-    let pen = Pen { p, r, c, a: accent, w: 1.25 };
-    let a = accent;
-    let red = Color32::from_rgb(0xD1, 0x3B, 0x3B);
-    let yellow = Color32::from_rgb(0xF2, 0xC8, 0x11);
-    let green = Color32::from_rgb(0x2E, 0x8B, 0x57);
-    let orange = Color32::from_rgb(0xE0, 0x7B, 0x1F);
+    let mono = accent == c || accent.a() == 0;
+    let [cr, cg, cb, _] = c.to_srgba_unmultiplied();
+    let dark = 0.2126 * f32::from(cr) + 0.7152 * f32::from(cg) + 0.0722 * f32::from(cb) > 127.0;
+    let (k, n) = if mono {
+        let t = Tones { ink: c, tint: c.gamma_multiply(0.22), solid: c };
+        (t, t)
+    } else {
+        (tones(family(name), dark), tones(Family::Neutral, dark))
+    };
+    let a = if mono {
+        c
+    } else if DATA_COLOUR.contains(&name) {
+        accent
+    } else {
+        k.solid
+    };
+    let pen = Pen { p, r, c, a, w: 1.4, k, n, mono };
+    if !art(&pen, name) {
+        // Fallback: a rounded tile with the first letter.
+        p.rect_stroke(r.shrink(r.width() * 0.12), 3.0, Stroke::new(1.0, c), egui::StrokeKind::Middle);
+        let ch = name.chars().next().map(|x| x.to_ascii_uppercase().to_string()).unwrap_or_default();
+        p.text(r.center(), egui::Align2::CENTER_CENTER, ch, FontId::proportional(r.height() * 0.45), a);
+    }
+}
+
+/// Draw the art for `name`; false when there is none.
+fn art(pen: &Pen, name: &str) -> bool {
+    let (r, c, a) = (pen.r, pen.c, pen.a);
+    let pick = |x: u32| if pen.mono { c } else { rgb(x) };
+    let red = pick(0xD13B3B);
+    let yellow = pick(0xF2C811);
+    let green = pick(0x2E8B57);
+    let orange = pick(0xE07B1F);
     match name {
         // Clipboard
         "paste" => {
@@ -203,15 +380,15 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
         "pilcrow" => pen.text(10.0, 10.5, 15.0, "¶", c, false),
         "alignLeft" => {
             pen.lines(3.0, 17.0, &[4.0, 10.0, 16.0]);
-            ().then_lines(&pen, 3.0, 12.0, &[7.0, 13.0])
+            ().then_lines(pen, 3.0, 12.0, &[7.0, 13.0])
         }
         "alignCenter" => {
             pen.lines(3.0, 17.0, &[4.0, 10.0, 16.0]);
-            ().then_lines(&pen, 6.0, 14.0, &[7.0, 13.0])
+            ().then_lines(pen, 6.0, 14.0, &[7.0, 13.0])
         }
         "alignRight" => {
             pen.lines(3.0, 17.0, &[4.0, 10.0, 16.0]);
-            ().then_lines(&pen, 8.0, 17.0, &[7.0, 13.0])
+            ().then_lines(pen, 8.0, 17.0, &[7.0, 13.0])
         }
         "justify" => pen.lines(3.0, 17.0, &[4.0, 7.0, 10.0, 13.0, 16.0]),
         // Text direction: lines set from the start edge, an arrow in the reading direction.
@@ -321,7 +498,7 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
             pen.fcircle(13.5, 7.0, 1.5, yellow);
         }
         "onlinePicture" => {
-            paint(p, Rect::from_min_size(r.min, r.size() * 0.8), "picture", c, accent);
+            art(&pen.at(Rect::from_min_size(r.min, r.size() * 0.8)), "picture");
             pen.circle(15.0, 15.0, 3.5, a);
         }
         "shapes" => {
@@ -556,8 +733,10 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
             pen.fill(&[(14.0, 6.0), (15.5, 4.5), (17.5, 6.5), (16.0, 8.0)], a);
         }
         "pencil" => {
-            pen.line(&[(4.0, 16.0), (14.0, 6.0), (16.0, 8.0), (6.0, 18.0), (3.5, 18.5), (4.0, 16.0)]);
-            pen.fill(&[(14.0, 6.0), (15.5, 4.5), (17.5, 6.5), (16.0, 8.0)], orange);
+            let k = pen.k;
+            pen.poly(&[(4.0, 16.0), (14.0, 6.0), (16.0, 8.0), (6.0, 18.0)], k.tint, k.ink);
+            pen.poly(&[(4.0, 16.0), (6.0, 18.0), (3.0, 19.0)], k.ink, Color32::TRANSPARENT);
+            pen.poly(&[(14.0, 6.0), (15.5, 4.5), (17.5, 6.5), (16.0, 8.0)], a, k.ink);
         }
         "eraser" => {
             pen.closed(&[(3.0, 13.0), (11.0, 5.0), (17.0, 11.0), (11.0, 17.0), (7.0, 17.0)], c);
@@ -762,15 +941,17 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
         }
         // Zotero
         "docPrefs" => {
-            pen.page(3.0, 2.5, 13.0, 17.5);
-            pen.lines(5.0, 10.0, &[7.5, 10.0]);
-            // A small gear: ring and teeth.
-            pen.circle(14.0, 14.0, 2.2, a);
-            for k in 0..6 {
-                let t = k as f32 * std::f32::consts::PI / 3.0;
-                let (dx, dy) = (t.cos(), t.sin());
-                pen.line_c(&[(14.0 + 2.8 * dx, 14.0 + 2.8 * dy), (14.0 + 4.2 * dx, 14.0 + 4.2 * dy)], a);
+            let (k, n) = (pen.k, pen.n);
+            pen.poly(&[(3.5, 2.5), (10.5, 2.5), (14.0, 6.0), (14.0, 17.5), (3.5, 17.5)], n.tint, n.ink);
+            for y in [7.0, 9.5] {
+                pen.seg(&[(5.5, y), (10.0, y)], n.ink);
             }
+            for i in 0..8 {
+                let t = std::f32::consts::TAU * i as f32 / 8.0;
+                pen.dot(14.0 + 4.0 * t.cos(), 14.0 + 4.0 * t.sin(), 1.3, k.solid);
+            }
+            pen.disc(14.0, 14.0, 3.2, k.solid, Color32::TRANSPARENT);
+            pen.disc(14.0, 14.0, 1.3, n.tint, Color32::TRANSPARENT);
         }
         "unlinkCitations" => {
             // Two chain links pulled apart, with a break between them.
@@ -1077,9 +1258,10 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
             pen.text(10.0, 13.0, 8.0, "A", a, false);
         }
         "properties" | "info" => {
-            pen.circle(10.0, 10.0, 7.0, c);
-            pen.line_c(&[(10.0, 9.0), (10.0, 14.5)], a);
-            pen.fcircle(10.0, 6.3, 1.0, a);
+            let (bg, fg) = pen.badge();
+            pen.disc(10.0, 10.0, 7.5, bg, pen.k.ink);
+            pen.dot(10.0, 6.4, 1.2, fg);
+            pen.heavy(&[(10.0, 9.2), (10.0, 14.2)], fg, 1.3);
         }
         // Table tools
         "insertAbove" | "insertBelow" | "insertLeft" | "insertRight" => {
@@ -1151,49 +1333,52 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
         }
         // Chrome
         "save" => {
-            pen.closed(&[(3.0, 3.0), (14.0, 3.0), (17.0, 6.0), (17.0, 17.0), (3.0, 17.0)], c);
-            pen.frect(6.0, 3.0, 13.0, 7.5, a);
-            pen.rect(6.0, 11.0, 14.0, 17.0, c);
+            let (k, n) = (pen.k, pen.n);
+            pen.poly(&[(3.0, 4.5), (4.5, 3.0), (14.0, 3.0), (17.0, 6.0), (17.0, 15.5), (15.5, 17.0), (4.5, 17.0), (3.0, 15.5)], k.tint, k.ink);
+            pen.rr(6.0, 3.0, 13.0, 7.5, 0.8, k.solid, Color32::TRANSPARENT);
+            pen.rr(5.8, 10.8, 14.2, 17.0, 1.0, n.tint, k.ink);
+            pen.seg(&[(8.0, 13.5), (12.0, 13.5)], k.ink);
         }
         "undo" => {
-            pen.line(&[(5.0, 8.0), (13.0, 8.0)]);
-            pen.p.add(Shape::line(
-                (0..=12)
-                    .map(|i| {
-                        let t = -std::f32::consts::FRAC_PI_2 + std::f32::consts::PI * i as f32 / 12.0;
-                        pen.pt(13.0 + 4.5 * t.cos(), 12.5 + 4.5 * t.sin())
-                    })
-                    .collect(),
-                pen.stroke(c),
-            ));
-            pen.line(&[(13.0, 17.0), (8.0, 17.0)]);
-            pen.fill(&[(2.5, 8.0), (6.5, 4.5), (6.5, 11.5)], a);
+            let k = pen.k;
+            let arc: Vec<(f32, f32)> = (0..=12)
+                .map(|i| {
+                    let t = -std::f32::consts::FRAC_PI_2 + std::f32::consts::PI * i as f32 / 12.0;
+                    (12.5 + 4.5 * t.cos(), 12.5 + 4.5 * t.sin())
+                })
+                .collect();
+            pen.seg(&[(6.5, 8.0), (12.5, 8.0)], k.ink);
+            pen.seg(&arc, k.ink);
+            pen.seg(&[(12.5, 17.0), (8.0, 17.0)], k.ink);
+            pen.poly(&[(2.5, 8.0), (7.0, 4.0), (7.0, 12.0)], k.solid, Color32::TRANSPARENT);
         }
         "redo" => {
-            pen.line(&[(15.0, 8.0), (7.0, 8.0)]);
-            pen.p.add(Shape::line(
-                (0..=12)
-                    .map(|i| {
-                        let t = std::f32::consts::FRAC_PI_2 + std::f32::consts::PI * i as f32 / 12.0;
-                        pen.pt(7.0 + 4.5 * t.cos(), 12.5 - 4.5 * t.sin())
-                    })
-                    .collect(),
-                pen.stroke(c),
-            ));
-            pen.line(&[(7.0, 17.0), (12.0, 17.0)]);
-            pen.fill(&[(17.5, 8.0), (13.5, 4.5), (13.5, 11.5)], a);
+            let k = pen.k;
+            let arc: Vec<(f32, f32)> = (0..=12)
+                .map(|i| {
+                    let t = std::f32::consts::FRAC_PI_2 + std::f32::consts::PI * i as f32 / 12.0;
+                    (7.5 + 4.5 * t.cos(), 12.5 - 4.5 * t.sin())
+                })
+                .collect();
+            pen.seg(&[(13.5, 8.0), (7.5, 8.0)], k.ink);
+            pen.seg(&arc, k.ink);
+            pen.seg(&[(7.5, 17.0), (12.0, 17.0)], k.ink);
+            pen.poly(&[(17.5, 8.0), (13.0, 4.0), (13.0, 12.0)], k.solid, Color32::TRANSPARENT);
         }
         "search" => {
-            pen.circle(8.5, 8.5, 5.0, c);
-            pen.line(&[(12.0, 12.0), (16.5, 16.5)]);
+            let k = pen.k;
+            pen.heavy(&[(12.2, 12.2), (16.8, 16.8)], k.solid, 2.0);
+            pen.disc(8.5, 8.5, 5.2, k.tint, k.ink);
         }
         "share" => {
-            pen.line(&[(10.0, 3.0), (10.0, 12.0)]);
-            pen.line(&[(6.5, 6.5), (10.0, 3.0), (13.5, 6.5)]);
-            pen.line(&[(5.0, 9.0), (3.5, 9.0), (3.5, 17.0), (16.5, 17.0), (16.5, 9.0), (15.0, 9.0)]);
+            let k = pen.k;
+            pen.seg(&[(6.0, 9.0), (4.0, 9.0), (4.0, 16.5), (16.0, 16.5), (16.0, 9.0), (14.0, 9.0)], k.ink);
+            pen.heavy(&[(10.0, 13.0), (10.0, 5.0)], k.solid, 1.3);
+            pen.poly(&[(6.5, 6.5), (10.0, 2.5), (13.5, 6.5)], k.solid, Color32::TRANSPARENT);
         }
         "user" => {
-            pen.fcircle(10.0, 7.0, 3.5, a);
+            let k = pen.k;
+            pen.disc(10.0, 6.8, 3.6, k.solid, Color32::TRANSPARENT);
             pen.p.add(Shape::convex_polygon(
                 (0..=16)
                     .map(|i| {
@@ -1201,42 +1386,45 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
                         pen.pt(10.0 - 6.5 * t.cos(), 18.0 - 6.0 * t.sin())
                     })
                     .collect(),
-                a,
-                Stroke::NONE,
+                k.tint,
+                pen.stroke(k.ink),
             ));
         }
         "close" => {
-            pen.line(&[(5.0, 5.0), (15.0, 15.0)]);
-            pen.line(&[(15.0, 5.0), (5.0, 15.0)]);
+            pen.seg(&[(5.5, 5.5), (14.5, 14.5)], pen.n.ink);
+            pen.seg(&[(14.5, 5.5), (5.5, 14.5)], pen.n.ink);
         }
         // A triangle filling most of its box: it is drawn at 9–12 pt beside combos and split
         // buttons, where a smaller one shrank to a dot (#535).
         "dropdown" => pen.fill(&[(3.0, 7.0), (17.0, 7.0), (10.0, 14.0)], c),
         "more" => {
             for x in [5.0, 10.0, 15.0] {
-                pen.fcircle(x, 10.0, 1.3, c);
+                pen.dot(x, 10.0, 1.5, pen.n.ink);
             }
         }
         "launcher" => {
-            pen.line(&[(5.0, 5.0), (5.0, 15.0), (15.0, 15.0)]);
-            pen.line(&[(8.0, 8.0), (15.0, 15.0)]);
-            pen.line(&[(11.0, 15.0), (15.0, 15.0), (15.0, 11.0)]);
+            let n = pen.n.ink;
+            pen.seg(&[(5.0, 5.0), (5.0, 15.0), (15.0, 15.0)], n);
+            pen.seg(&[(8.0, 8.0), (14.5, 14.5)], n);
+            pen.seg(&[(11.0, 15.0), (15.0, 15.0), (15.0, 11.0)], n);
         }
         "pin" => {
-            pen.line(&[(10.0, 12.0), (10.0, 18.0)]);
-            pen.rect(7.0, 2.0, 13.0, 9.0, c);
-            pen.line(&[(5.0, 12.0), (15.0, 12.0)]);
+            let k = pen.k;
+            pen.seg(&[(10.0, 12.0), (10.0, 18.0)], k.ink);
+            pen.rr(7.0, 2.5, 13.0, 9.5, 1.5, k.solid, Color32::TRANSPARENT);
+            pen.seg(&[(5.0, 12.0), (15.0, 12.0)], k.ink);
+            pen.poly(&[(7.0, 9.0), (13.0, 9.0), (14.5, 12.0), (5.5, 12.0)], k.tint, k.ink);
         }
         "plus" => {
-            pen.line(&[(10.0, 4.0), (10.0, 16.0)]);
-            pen.line(&[(4.0, 10.0), (16.0, 10.0)]);
+            pen.seg(&[(10.0, 4.5), (10.0, 15.5)], pen.n.ink);
+            pen.seg(&[(4.5, 10.0), (15.5, 10.0)], pen.n.ink);
         }
-        "minus" => pen.line(&[(4.0, 10.0), (16.0, 10.0)]),
-        "check" => pen.line_c(&[(4.0, 10.5), (8.5, 15.0), (16.5, 5.0)], c),
-        "chevronLeft" => pen.line(&[(13.0, 4.0), (7.0, 10.0), (13.0, 16.0)]),
-        "chevronRight" => pen.line(&[(7.0, 4.0), (13.0, 10.0), (7.0, 16.0)]),
-        "chevronUp" => pen.line(&[(4.0, 13.0), (10.0, 7.0), (16.0, 13.0)]),
-        "chevronDown" => pen.line(&[(4.0, 7.0), (10.0, 13.0), (16.0, 7.0)]),
+        "minus" => pen.seg(&[(4.5, 10.0), (15.5, 10.0)], pen.n.ink),
+        "check" => pen.seg(&[(4.5, 10.5), (8.5, 14.5), (16.0, 5.5)], pen.n.ink),
+        "chevronLeft" => pen.seg(&[(12.5, 4.5), (7.0, 10.0), (12.5, 15.5)], pen.n.ink),
+        "chevronRight" => pen.seg(&[(7.5, 4.5), (13.0, 10.0), (7.5, 15.5)], pen.n.ink),
+        "chevronUp" => pen.seg(&[(4.5, 12.5), (10.0, 7.0), (15.5, 12.5)], pen.n.ink),
+        "chevronDown" => pen.seg(&[(4.5, 7.5), (10.0, 13.0), (15.5, 7.5)], pen.n.ink),
         // Read Aloud player
         "mediaPlay" => pen.fill(&[(6.0, 4.0), (16.0, 10.0), (6.0, 16.0)], c),
         "mediaPause" => {
@@ -1279,16 +1467,18 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
         }
         // Open: a folder with its flap lifted.
         "open" => {
-            pen.closed(&[(2.5, 5.0), (7.5, 5.0), (9.0, 6.5), (15.5, 6.5), (15.5, 9.0)], c);
-            pen.line(&[(2.5, 5.0), (2.5, 16.0)]);
-            pen.closed(&[(2.5, 16.0), (5.0, 9.0), (18.0, 9.0), (15.5, 16.0)], a);
+            let k = pen.k;
+            pen.poly(&[(2.5, 5.0), (3.5, 4.0), (7.5, 4.0), (9.0, 5.5), (15.5, 5.5), (16.5, 6.5), (16.5, 15.5), (2.5, 15.5)], k.tint, k.ink);
+            pen.poly(&[(5.0, 9.0), (18.5, 9.0), (16.0, 16.0), (2.5, 16.0)], k.solid, k.ink);
         }
         // Print: a printer with a sheet coming out.
         "print" => {
-            pen.rect(6.0, 2.5, 14.0, 7.0, c);
-            pen.rect(2.5, 7.0, 17.5, 14.0, c);
-            pen.closed(&[(6.0, 11.5), (14.0, 11.5), (14.0, 17.5), (6.0, 17.5)], a);
-            pen.fcircle(15.0, 9.5, 0.8, c);
+            let (k, n) = (pen.k, pen.n);
+            pen.rr(6.0, 2.5, 14.0, 7.5, 0.8, n.tint, n.ink);
+            pen.rr(2.5, 7.0, 17.5, 14.5, 2.0, k.tint, k.ink);
+            pen.rr(6.0, 11.5, 14.0, 17.5, 0.8, n.tint, n.ink);
+            pen.seg(&[(8.0, 14.0), (12.0, 14.0)], k.solid);
+            pen.dot(14.8, 9.6, 1.0, k.solid);
         }
         "alignText" => {
             // A box with its text lines in the middle, arrows to the top and bottom edges.
@@ -1312,18 +1502,23 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
 
         // The built-in file browser (#576): a folder, a file and the home folder.
         "folder" => {
-            pen.frect(2.5, 4.5, 8.5, 7.0, yellow);
-            pen.frect(2.5, 6.5, 17.5, 16.0, yellow);
-            pen.closed(&[(2.5, 4.5), (8.0, 4.5), (9.5, 6.5), (17.5, 6.5), (17.5, 16.0), (2.5, 16.0)], c);
+            let k = pen.k;
+            pen.poly(&[(2.5, 5.0), (3.5, 4.0), (7.5, 4.0), (9.0, 5.5), (16.5, 5.5), (17.5, 6.5), (17.5, 16.0), (2.5, 16.0)], k.tint, k.ink);
+            pen.rr(2.5, 8.0, 17.5, 16.0, 1.2, k.solid, k.ink);
         }
         "file" => {
-            pen.page(4.5, 2.0, 15.5, 18.0);
-            pen.lines(7.0, 13.0, &[9.0, 12.0, 15.0]);
+            let (k, n) = (pen.k, pen.n);
+            pen.poly(&[(4.0, 2.5), (12.0, 2.5), (16.0, 6.5), (16.0, 17.5), (4.0, 17.5)], n.tint, n.ink);
+            pen.poly(&[(12.0, 2.5), (16.0, 6.5), (12.0, 6.5)], k.tint, n.ink);
+            for y in [9.5, 12.0, 14.5] {
+                pen.seg(&[(6.5, y), (13.5, y)], k.solid);
+            }
         }
         "homeFolder" => {
-            pen.closed(&[(3.0, 9.5), (10.0, 3.5), (17.0, 9.5)], c);
-            pen.closed(&[(5.0, 8.5), (5.0, 17.0), (15.0, 17.0), (15.0, 8.5)], c);
-            pen.frect(8.5, 12.0, 11.5, 17.0, a);
+            let k = pen.k;
+            pen.rr(4.5, 9.0, 15.5, 17.0, 1.0, k.tint, k.ink);
+            pen.poly(&[(10.0, 2.5), (18.0, 9.5), (2.0, 9.5)], k.solid, k.ink);
+            pen.rr(8.5, 12.0, 11.5, 17.0, 0.6, k.ink, Color32::TRANSPARENT);
         }
 
         // Outlining tab: arrows moving a paragraph between outline levels and along the outline.
@@ -1365,8 +1560,9 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
             pen.line_c(&[(13.0, 8.0), (7.0, 14.0)], red);
         }
         "help" => {
-            pen.circle(10.0, 10.0, 7.0, c);
-            pen.text(10.0, 10.0, 10.0, "?", a, true);
+            let (bg, fg) = pen.badge();
+            pen.disc(10.0, 10.0, 7.5, bg, pen.k.ink);
+            pen.text(10.0, 9.6, 11.0, "?", fg, true);
         }
         // Developer › Controls: a field's frame with what it holds.
         "ccRichText" => {
@@ -1427,13 +1623,9 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
             pen.line_c(&[(4.0, 12.0), (8.0, 16.0)], a);
             pen.line(&[(7.0, 13.0), (7.0, 12.0)]);
         }
-        _ => {
-            // Fallback: a rounded tile with the first letter.
-            p.rect_stroke(r.shrink(r.width() * 0.12), 3.0, Stroke::new(1.0, c), egui::StrokeKind::Middle);
-            let ch = name.chars().next().map(|x| x.to_ascii_uppercase().to_string()).unwrap_or_default();
-            p.text(r.center(), egui::Align2::CENTER_CENTER, ch, FontId::proportional(r.height() * 0.45), a);
-        }
+        _ => return false,
     }
+    true
 }
 
 trait ThenLines {
@@ -1466,5 +1658,121 @@ pub fn library(p: &Painter, r: Rect, icon: &wordcraft_render::icon_lib::Icon, c:
             }
             p.add(Shape::line(pts, stroke));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Paint `name` and return the unmultiplied RGB of every visible fill, stroke and text colour.
+    fn colours(name: &str, c: Color32, a: Color32) -> Vec<[u8; 3]> {
+        let ctx = egui::Context::default();
+        ctx.begin_pass(Default::default());
+        crate::theme::install_fonts(&ctx);
+        ctx.end_pass().textures_delta.clear();
+        ctx.begin_pass(Default::default());
+        let p = ctx.layer_painter(egui::LayerId::background());
+        paint(&p, Rect::from_min_size(pos2(0.0, 0.0), vec2(32.0, 32.0)), name, c, a);
+        let mut out = ctx.end_pass();
+        out.textures_delta.clear();
+        let mut v = Vec::new();
+        fn walk(s: &Shape, v: &mut Vec<[u8; 3]>) {
+            let mut push = |c: Color32| {
+                if c.a() > 0 {
+                    let [r, g, b, _] = c.to_srgba_unmultiplied();
+                    v.push([r, g, b]);
+                }
+            };
+            match s {
+                Shape::Vec(xs) => xs.iter().for_each(|x| walk(x, v)),
+                Shape::Rect(r) => {
+                    push(r.fill);
+                    push(r.stroke.color);
+                }
+                Shape::Circle(c) => {
+                    push(c.fill);
+                    push(c.stroke.color);
+                }
+                Shape::Path(pth) => {
+                    push(pth.fill);
+                    if let egui::epaint::ColorMode::Solid(c) = pth.stroke.color {
+                        push(c);
+                    }
+                }
+                Shape::LineSegment { stroke, .. } => push(stroke.color),
+                Shape::Text(t) => {
+                    push(t.fallback_color);
+                    for r in &t.galley.job.sections {
+                        push(r.format.color);
+                    }
+                }
+                _ => {}
+            }
+        }
+        for cs in &out.shapes {
+            walk(&cs.shape, &mut v);
+        }
+        v
+    }
+    fn near(a: [u8; 3], b: Color32) -> bool {
+        let [r, g, bb, _] = b.to_srgba_unmultiplied();
+        a.iter().zip([r, g, bb]).all(|(x, y)| x.abs_diff(y) <= 3)
+    }
+    const INK: Color32 = Color32::from_rgb(0x42, 0x42, 0x42);
+    const DARK_INK: Color32 = Color32::from_rgb(0xDD, 0xDD, 0xDD);
+    const ACCENT: Color32 = Color32::from_rgb(0x2B, 0x57, 0x9A);
+
+    #[test]
+    fn monochrome_when_accent_equals_ink() {
+        let grey = Color32::from_rgb(0xA6, 0xA6, 0xA6);
+        for name in ["paste", "save", "table", "picture", "comment", "bold"] {
+            let cs = colours(name, grey, grey);
+            assert!(!cs.is_empty(), "{name}");
+            assert!(cs.iter().all(|c| near(*c, grey)), "{name}: {cs:?}");
+        }
+    }
+    #[test]
+    fn monochrome_when_accent_transparent() {
+        let cs = colours("replayPlay", INK, Color32::TRANSPARENT);
+        assert!(!cs.is_empty() && cs.iter().all(|c| near(*c, INK)), "{cs:?}");
+    }
+    #[test]
+    fn colour_mode_uses_the_family_palette() {
+        let cs = colours("paste", INK, ACCENT);
+        let orange = tones(Family::Orange, false);
+        assert!(cs.iter().any(|c| near(*c, orange.solid)), "{cs:?}");
+        assert!(!cs.iter().any(|c| near(*c, ACCENT)), "accent is replaced: {cs:?}");
+    }
+    #[test]
+    fn dark_ink_picks_dark_tones() {
+        let cs = colours("paste", DARK_INK, ACCENT);
+        assert!(cs.iter().any(|c| near(*c, tones(Family::Orange, true).solid)), "{cs:?}");
+    }
+    #[test]
+    fn data_colour_icons_keep_accent() {
+        let chosen = Color32::from_rgb(0x11, 0xAA, 0x33);
+        for name in ["pen", "pencil"] {
+            assert!(colours(name, INK, chosen).iter().any(|c| near(*c, chosen)), "{name}");
+        }
+    }
+    #[test]
+    fn families_follow_the_spec_groups() {
+        assert_eq!(family("paste"), Family::Orange);
+        assert_eq!(family("bold"), Family::Red);
+        assert_eq!(family("highlight"), Family::Amber);
+        assert_eq!(family("bullets"), Family::Blue);
+        assert_eq!(family("table"), Family::Green);
+        assert_eq!(family("newComment"), Family::Purple);
+        assert_eq!(family("accept"), Family::Green);
+        assert_eq!(family("reject"), Family::Red);
+        assert_eq!(family("margins"), Family::Teal);
+        assert_eq!(family("envelope"), Family::Amber);
+        assert_eq!(family("dropdown"), Family::Neutral);
+        assert_eq!(family("save"), Family::Blue);
+    }
+    #[test]
+    fn unknown_name_draws_fallback() {
+        assert!(!colours("no-such-icon", INK, ACCENT).is_empty());
     }
 }

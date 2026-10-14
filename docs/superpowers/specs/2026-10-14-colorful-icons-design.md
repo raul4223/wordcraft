@@ -47,8 +47,8 @@ controls (`dropdown`, `chevron*`, `plus`, `minus`, `check`, `close`, `more`, `la
   `c` (fills at reduced alpha). This is how callers already ask for disabled icons, the white
   sidebar icons, dropdown arrows and tinted pins, so they keep working with no call-site change.
 - **Data-colour icons** keep `accent` for the part that shows the user's chosen colour:
-  `fontcolor`, `highlight`, `shading`, `textFill`, `textOutline`, `pageColor`, `pen`, `pencil`,
-  `borderPainter`. The rest of the icon uses the family palette.
+  `pen` and `pencil` (the Draw tab passes the pen's colour). Font colour and highlight buttons
+  paint the chosen colour over the icon themselves, so those icons use the family palette.
 - Otherwise colours come from the family palette; `accent` is ignored.
 - Stroke width 1.4 (on the 20-unit grid) with round joins/caps; rectangles get 1.5–2 unit radii.
 

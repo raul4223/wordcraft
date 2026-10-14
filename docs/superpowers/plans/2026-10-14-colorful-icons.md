@@ -19,7 +19,7 @@ every *legacy* icon's accent to its family colour, so the whole set turns colour
 
 - `icons::paint(p, r, name, c, accent)` keeps its signature; no call site changes.
 - Monochrome when `accent == c` or `accent.a() == 0`: every part in `c`.
-- Data-colour icons keep `accent` for the chosen-colour part: `fontcolor`, `highlight`, `shading`, `textFill`, `textOutline`, `pageColor`, `pen`, `pencil`, `borderPainter`.
+- Data-colour icons keep `accent` for the chosen-colour part: `pen`, `pencil` (font colour/highlight buttons paint their swatch over the icon).
 - Dark theme ⇔ luminance of `c` > 0.5.
 - Stroke width 1.4 grid units, round caps/joins; rectangles radius 1.5–2.
 - Palette hex values exactly as the spec table.
@@ -63,7 +63,9 @@ use super::*;
 /// Paint `name` and return the unmultiplied RGB of every visible fill, stroke and text colour.
 fn colours(name: &str, c: Color32, a: Color32) -> Vec<[u8; 3]> {
     let ctx = egui::Context::default();
-    let _ = ctx.run(Default::default(), |ctx| crate::theme::install_fonts(ctx));
+    ctx.begin_pass(Default::default());
+    crate::theme::install_fonts(&ctx);
+    let _ = ctx.end_pass();
     let out = ctx.run(Default::default(), |ctx| {
         let p = ctx.layer_painter(egui::LayerId::background());
         paint(&p, Rect::from_min_size(pos2(0.0, 0.0), vec2(32.0, 32.0)), name, c, a);
