@@ -173,6 +173,8 @@ fn services(inbox: Inbox, ctx: egui::Context, dirty: Rc<Cell<bool>>, saves: Asyn
     let open_inbox = inbox.clone();
     let save_ctx = ctx.clone();
     Services {
+        // getTimezoneOffset is in minutes west of UTC.
+        utc_offset: Some(Box::new(|| (-js_sys::Date::new_0().get_timezone_offset() * 60.0) as i32)),
         open_async: Some(Box::new(move |purpose: &str| {
             let inbox = open_inbox.clone();
             let ctx = ctx.clone();

@@ -21,6 +21,7 @@ mod graphics;
 mod logging;
 mod print;
 mod region;
+mod reveal;
 #[cfg(target_os = "macos")]
 mod traffic_lights;
 
@@ -217,6 +218,8 @@ fn services(file_dialog: file_dialogs::Hook, ctx: &egui::Context) -> Services {
         set_clipboard_html: Some(Box::new(clipboard::set_html)),
         clipboard_rtf: Some(Box::new(clipboard::rtf)),
         clipboard_formats: Some(Box::new(clipboard::formats)),
+        utc_offset: Some(Box::new(|| jiff::Zoned::now().offset().seconds())),
+        reveal: Some(Box::new(reveal::reveal)),
         ..Default::default()
     }
 }
